@@ -1,0 +1,26 @@
+{
+  "name": "Luggage Tag Designer 2 - Shape, Window & QR Builder",
+  "short_name": "Tag Designer 2",
+  "description": "From-scratch shape/window designer with a live QR capacity calculator and mirrored front/back layout for printable luggage tags.",
+  "id": "./",
+  "start_url": "./designer.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
