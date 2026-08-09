@@ -54,7 +54,9 @@ main{flex:1; display:flex; min-height:0}
   background:var(--panel2); flex:0 0 auto; flex-wrap:wrap;
 }
 #stage-holder{flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:20px}
-#stage{background:#fff; box-shadow:0 10px 40px rgba(0,0,0,.5); max-width:100%; max-height:100%}
+#stage{background:#fff; box-shadow:0 10px 40px rgba(0,0,0,.5); max-width:100%; max-height:100%;
+  -webkit-user-select:none; user-select:none; -webkit-user-drag:none; -khtml-user-drag:none; -moz-user-select:none;}
+#stage *{-webkit-user-drag:none;}
 .win-shape{fill:rgba(56,189,248,.06); stroke:#94a3b8; stroke-width:.3; cursor:move}
 .win-shape.selected{stroke:var(--accent); stroke-width:.6; fill:rgba(56,189,248,.14)}
 .win-shape.qr-win{stroke:var(--green)}
@@ -471,9 +473,9 @@ var G = {
   backSameQr: true,
   print: { mode:'virtual', paper:'A5', orientation:'portrait', marginTop:10, marginBottom:10, marginLeft:2, marginRight:2, showFoldLine:true },
   qr: {
-    front: {type:'shortlink', shortLink:'https://as-icloud.github.io/LT/', viewerBase:'', text:'', wifiSSID:'', wifiPass:'', wifiSec:'WPA', ec:'M',
+    front: {type:'url', shortLink:'', viewerBase:'', text:'', wifiSSID:'', wifiPass:'', wifiSec:'WPA', ec:'M',
       langs:{s:true,f:true,d:true,i:true,p:true,h:false,u:false,a:false,c:false,j:false}},
-    back:  {type:'vcard',     shortLink:'https://as-icloud.github.io/LT/', viewerBase:'', text:'', wifiSSID:'', wifiPass:'', wifiSec:'WPA', ec:'M',
+    back:  {type:'vcard',     shortLink:'', viewerBase:'', text:'', wifiSSID:'', wifiPass:'', wifiSec:'WPA', ec:'M',
       langs:{s:true,f:true,d:true,i:true,p:true,h:false,u:false,a:false,c:false,j:false}}
   },
   selected: null,   // {side,id}
@@ -1215,6 +1217,11 @@ document.addEventListener('mousemove', function(evt){
 
 document.addEventListener('mousedown', function(evt){
   var t = evt.target;
+  // Block Safari/WebKit's native "drag the SVG/text/image as a ghost" behaviour, which
+  // hijacks the gesture into drag/dragover events instead of mousemove — this is what was
+  // freezing the cursor mm-readout mid-drag. Any mousedown that lands inside the stage
+  // should stay ours, not the browser's, whether or not it hits a window shape.
+  if(t.closest && t.closest('#stage')) evt.preventDefault();
   if(t.classList && t.classList.contains('rotate-handle')){
     var id=parseInt(t.dataset.id,10), side=t.dataset.side;
     var win=findWindow(side,id);
@@ -1777,6 +1784,8 @@ function init(){
   document.getElementById('backD').value=G.back.shape.d;
   document.getElementById('backVerts').value=G.back.shape.vertices.map(function(p){return p[0]+','+p[1];}).join('\n');
 
+  document.getElementById('frontQrType').value=G.qr.front.type;
+  document.getElementById('backQrType').value=G.qr.back.type;
   document.getElementById('frontShortLink').value=G.qr.front.shortLink;
   document.getElementById('frontEc').value=G.qr.front.ec;
   document.getElementById('backShortLink').value=G.qr.back.shortLink;
