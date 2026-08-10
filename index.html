@@ -1,0 +1,2364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Luggage Tag Designer 2 - Shape, Window &amp; QR Builder</title>
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0f172a; --panel:#111c33; --panel2:#16223d; --border:#263352; --text:#e7ecf5; --muted:#8996b3;
+  --accent:#38bdf8; --accent2:#818cf8; --green:#34d399; --red:#f87171; --amber:#fbbf24;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg); color:var(--text);
+  display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+header{
+  display:flex; align-items:center; gap:12px; padding:10px 16px;
+  background:var(--panel); border-bottom:1px solid var(--border); flex:0 0 auto;
+}
+header h1{font-size:15px; margin:0; font-weight:800; color:var(--accent)}
+header .sp{flex:1}
+header .cursor-readout{
+  font:600 12px/1 ui-monospace,Menlo,Consolas,monospace; color:var(--muted);
+  background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:6px 10px;
+  min-width:220px; text-align:center;
+}
+button.btn{
+  background:#1d2b4a; color:var(--text); border:1px solid var(--border); border-radius:8px;
+  padding:8px 12px; font-weight:700; font-size:12px; cursor:pointer;
+}
+button.btn:hover{background:#233458}
+button.btn.primary{background:var(--accent); color:#052; color:#08131f; border-color:var(--accent)}
+button.btn.primary:hover{filter:brightness(1.08)}
+button.btn.danger{background:#3a1620; border-color:#7f1d1d; color:#fca5a5}
+button.btn.small{padding:5px 9px; font-size:11px}
+main{flex:1; display:flex; min-height:0}
+#controls{
+  width:46%; min-width:340px; max-width:640px; overflow-y:auto; padding:14px 14px 60px;
+  border-right:1px solid var(--border); background:var(--panel);
+}
+#preview-wrap{
+  flex:1; display:flex; flex-direction:column; min-width:0; background:#0b1424;
+}
+#preview-toolbar{
+  display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border);
+  background:var(--panel2); flex:0 0 auto; flex-wrap:wrap;
+}
+#stage-holder{flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:20px}
+#stage{background:#fff; box-shadow:0 10px 40px rgba(0,0,0,.5); max-width:100%; max-height:100%;
+  -webkit-user-select:none; user-select:none; -webkit-user-drag:none; -khtml-user-drag:none; -moz-user-select:none;}
+#stage *{-webkit-user-drag:none;}
+.win-shape{fill:rgba(56,189,248,.06); stroke:#94a3b8; stroke-width:.3; cursor:move}
+/* Border-on/off mirrors what will actually print: a solid dark line means "this border
+   prints", a thin dashed line means "on-screen guide only, won't appear on paper" — so
+   toggling the checkbox gives visible feedback without needing a test print to check. */
+.win-shape.border-on{stroke:#1f2937; stroke-width:.45; stroke-dasharray:none}
+.win-shape.border-off{stroke-dasharray:1,1.2}
+.win-shape.selected{stroke:var(--accent); stroke-width:.6; fill:rgba(56,189,248,.14)}
+.win-shape.qr-win{stroke:var(--green)}
+.rotate-handle{fill:var(--accent2); stroke:#fff; stroke-width:.2; cursor:grab}
+.resize-handle{fill:var(--amber); stroke:#fff; stroke-width:.2; cursor:nwse-resize}
+.rotate-handle-line{stroke:#94a3b8; stroke-width:.25; stroke-dasharray:1,1}
+.tag-outline{fill:#ffffff; stroke:#1f2937; stroke-width:.4}
+.tag-outline.border-off{stroke:#64748b; stroke-dasharray:1.5,1.2; stroke-width:.3}
+.tag-outline.back{stroke-dasharray:1.2,1}
+.tag-outline.back.border-off{stroke-dasharray:1,1.6}
+.fold-gap-label{font:2.6px ui-monospace,monospace; fill:#94a3b8}
+
+section.card{
+  background:var(--panel2); border:1px solid var(--border); border-radius:12px;
+  padding:12px 14px; margin-bottom:12px;
+}
+section.card > h2{
+  font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--accent);
+  margin:0 0 10px; display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
+}
+section.card > h2 .chev{margin-left:auto; font-size:10px; color:var(--muted)}
+section.card.collapsed > *:not(h2){display:none}
+label{display:block; font-size:11.5px; font-weight:700; color:var(--muted); margin:8px 0 3px}
+label:first-of-type{margin-top:0}
+input[type=text],input[type=number],input[type=url],textarea,select{
+  width:100%; background:#0c1730; border:1px solid var(--border); color:var(--text);
+  border-radius:7px; padding:7px 9px; font:inherit; font-size:12.5px;
+}
+input[type=color]{width:44px; height:30px; padding:2px; border-radius:7px; border:1px solid var(--border); background:#0c1730}
+textarea{resize:vertical; min-height:52px}
+.row{display:flex; gap:8px}
+.row > *{flex:1; min-width:0}
+.row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+.row4{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px}
+.chk{display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--text); margin:6px 0}
+.chk input{width:15px; height:15px}
+.note{font-size:11px; color:var(--muted); line-height:1.4; margin:4px 0 8px}
+.pill-group{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0}
+.pill{
+  padding:6px 10px; border-radius:999px; border:1px solid var(--border); background:#0c1730;
+  font-size:11.5px; font-weight:700; cursor:pointer; color:var(--muted);
+}
+.pill.on{background:var(--accent); color:#08131f; border-color:var(--accent)}
+.win-card{border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:#0d1830}
+.win-card .win-head{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.win-card .win-head b{font-size:12.5px}
+.win-card .win-head .tag{font-size:10px; background:#152040; border:1px solid var(--border); border-radius:6px; padding:2px 6px; color:var(--muted)}
+.win-card .win-head .tag.qr{color:var(--green); border-color:#14532d}
+.qr-capacity{
+  margin-top:8px; padding:9px 10px; border-radius:8px; background:#0a1428; border:1px solid var(--border);
+  font-size:11.5px; line-height:1.6;
+}
+.qr-capacity b{color:var(--green)}
+.qr-capacity.warn{border-color:#7f1d1d}
+.qr-capacity.warn b{color:var(--red)}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+hr.sep{border:none; border-top:1px solid var(--border); margin:10px 0}
+.field-vis-table{display:grid; grid-template-columns:1fr auto; gap:2px 8px; font-size:11.5px; margin-top:4px}
+.field-vis-table > div:nth-child(odd){color:var(--muted)}
+#addWindowBar{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap}
+.small-input{width:70px !important; display:inline-block}
+.help-inline{color:var(--muted); font-size:10.5px}
+#printStage{display:none}
+@media print{
+  body *{visibility:hidden}
+  #printStage, #printStage *{visibility:visible}
+  #printStage{
+    display:block !important; position:absolute; left:0; top:0; margin:0; padding:0;
+    box-shadow:none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏷️ Luggage Tag Designer 2</h1>
+  <div class="cursor-readout" id="cursorReadout">x: — mm&nbsp;&nbsp;y: — mm</div>
+  <div class="sp"></div>
+  <div id="cursorTip" style="position:fixed; z-index:999; display:none; pointer-events:none; background:#0f172a; color:#38bdf8; border:1px solid #334155; border-radius:6px; padding:3px 8px; font-size:12px; font-family:monospace; white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.4);"></div>
+  <button class="btn" onclick="saveDesign()">💾 Save</button>
+  <button class="btn" onclick="showSavedDesignsModal()">📂 My Designs<span id="savedDesignsCount"></span></button>
+  <button class="btn" onclick="showPrintPreview()">👁 Preview</button>
+  <button class="btn" onclick="exportPDF()">⬇ PDF</button>
+  <button class="btn" onclick="exportJPG()">⬇ JPG</button>
+  <button class="btn" onclick="exportPNG()">⬇ PNG</button>
+  <button class="btn primary" onclick="doPrint()">🖨 Print</button>
+</header>
+
+<div id="savedDesignsOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; align-items:center; justify-content:center; padding:24px;" onclick="if(event.target===this) closeSavedDesignsModal()">
+  <div style="background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; width:min(480px,92vw); max-height:80vh; display:flex; flex-direction:column; gap:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+      <strong style="font-size:14px;">Saved designs (this browser only)</strong>
+      <button class="btn small" onclick="closeSavedDesignsModal()">✕ Close</button>
+    </div>
+    <div class="note">Stored locally in this browser — they won't follow you to a different computer or browser, and clearing site data removes them. Export a PDF/PNG for anything you want to keep permanently.</div>
+    <div id="savedDesignsList" style="overflow:auto"></div>
+  </div>
+</div>
+
+<div id="printPreviewOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; align-items:center; justify-content:center; padding:24px;" onclick="if(event.target===this) closePrintPreview()">
+  <div style="background:#fff; border-radius:10px; padding:16px; max-width:96vw; max-height:92vh; display:flex; flex-direction:column; gap:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+      <strong id="printPreviewTitle" style="color:#0f172a; font-size:14px;"></strong>
+      <button class="btn small" onclick="closePrintPreview()">✕ Close</button>
+    </div>
+    <div id="printPreviewHost" style="overflow:auto; max-width:90vw; max-height:80vh; display:flex; align-items:flex-start; justify-content:center; background:#e2e8f0; border-radius:6px; padding:16px;"></div>
+    <div id="printPreviewNote" style="font-size:12px; color:#475569;"></div>
+  </div>
+</div>
+
+<div id="qrZoomOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; align-items:center; justify-content:center; padding:24px;" onclick="if(event.target===this) closeQrZoomPreview()">
+  <div style="background:#fff; border-radius:10px; padding:16px; max-width:96vw; max-height:92vh; display:flex; flex-direction:column; gap:10px; align-items:center;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; width:100%;">
+      <strong id="qrZoomTitle" style="color:#0f172a; font-size:14px;"></strong>
+      <button class="btn small" onclick="closeQrZoomPreview()">✕ Close</button>
+    </div>
+    <div id="qrZoomHost" style="overflow:auto; max-width:90vw; max-height:70vh; display:flex; align-items:flex-start; justify-content:center; background:#e2e8f0; border-radius:6px; padding:16px;"></div>
+    <div id="qrZoomNote" style="font-size:12px; color:#475569; width:100%;"></div>
+  </div>
+</div>
+
+<main>
+  <div id="controls">
+
+    <section class="card" id="cardFrontShape">
+      <h2 onclick="toggleCard(this)">1 · Front Tag Shape <span class="chev">▾</span></h2>
+      <label>Shape</label>
+      <div class="pill-group" data-group="frontShapeType">
+        <div class="pill" data-val="rect">Rectangle</div>
+        <div class="pill" data-val="square">Square</div>
+        <div class="pill" data-val="circle">Circle</div>
+        <div class="pill" data-val="polygon">Polygon</div>
+      </div>
+
+      <div id="frontRectFields" class="row3">
+        <div><label>Width (mm)</label><input type="number" step="0.5" id="frontW" data-side="front" data-field="w"></div>
+        <div><label>Height (mm)</label><input type="number" step="0.5" id="frontH" data-side="front" data-field="h"></div>
+        <div><label>Corner radius (mm)</label><input type="number" step="0.5" id="frontRx" data-side="front" data-field="rx"></div>
+      </div>
+      <div id="frontCircleFields" class="row" style="display:none">
+        <div><label>Diameter (mm)</label><input type="number" step="0.5" id="frontD" data-side="front" data-field="d"></div>
+      </div>
+      <div id="frontPolyFields" style="display:none">
+        <label>Vertices — one "x,y" per line, mm, origin bottom-left (Y-up)</label>
+        <textarea id="frontVerts" data-side="front" data-field="vertices" rows="4" placeholder="0,0&#10;92,0&#10;92,51&#10;0,51"></textarea>
+        <div class="note">Straight-line polygon outline. Vertices are joined in the order listed and closed automatically back to the first point.</div>
+      </div>
+      <div class="chk"><input type="checkbox" id="frontShapePrintBorder" data-side="front" data-field="shapePrintBorder"><label for="frontShapePrintBorder" style="margin:0">Print this outline's border</label></div>
+      <div class="note" id="frontShapeNote">Coordinate origin is the bottom-left corner of this shape's bounding box. X increases right, Y increases up — matches the live cursor readout above.</div>
+    </section>
+
+    <section class="card" id="cardFrontWindows">
+      <h2 onclick="toggleCard(this)">2 · Front Windows (text / image / QR) <span class="chev">▾</span></h2>
+      <div id="addWindowBar">
+        <button class="btn small" onclick="addWindow('front','rect')">+ Rect window</button>
+        <button class="btn small" onclick="addWindow('front','square')">+ Square window</button>
+        <button class="btn small" onclick="addWindow('front','circle')">+ Circle window</button>
+      </div>
+      <div id="frontWindowList"></div>
+    </section>
+
+    <section class="card" id="cardPersonal">
+      <h2 onclick="toggleCard(this)">3 · Personal Details <span class="chev">▾</span></h2>
+      <div class="note">These are shared by any window whose content is bound to "Personal Details". Tick which fields are actually allowed into a QR payload with the checkboxes on the right.</div>
+      <button class="btn small" style="margin-bottom:8px" onclick="restoreSampleDetails()">↺ Restore sample data</button>
+      <div class="field-vis-table" id="personalFields"></div>
+    </section>
+
+    <section class="card" id="cardFrontQr">
+      <h2 onclick="toggleCard(this)">4 · Front QR Content &amp; Info Page <span class="chev">▾</span></h2>
+      <div class="note">Pick what any front window flagged "Use as QR code" (see step 2) actually encodes. A window's own live capacity check tells you if the chosen content fits.</div>
+      <label>What the front QR(s) encode</label>
+      <select id="frontQrType" data-side="front" data-field="qrType">
+        <option value="shortlink">🔗 Short URL only</option>
+        <option value="url">🏷 Personal Details — online page (needs internet)</option>
+        <option value="multilang">🌐 Multilingual page — pick 5+ languages (needs internet)</option>
+        <option value="vcard">👤 vCard contact — fully offline</option>
+        <option value="text">📝 Plain text</option>
+        <option value="wifi">📶 WiFi network</option>
+      </select>
+
+      <div id="frontQr_shortlink">
+        <label>Short URL</label>
+        <input type="url" id="frontShortLink" data-side="front" data-field="shortLink" placeholder="https://example.github.io/your-repo/">
+        <div class="note" id="frontShortLinkWarn"></div>
+        <div class="note">This is exactly what's typed here — nothing else gets added, so keep the QR small. Want it to still open a page with all your details, without a long query string in it? Generate a standalone info page below, upload that one file next to viewer.html, then paste its URL up here.</div>
+        <button class="btn small" style="margin-top:6px" onclick="exportBakedInfoPage()">⬇ Generate info page (HTML) for this Short URL</button>
+        <div class="note" id="bakedInfoStatus"></div>
+      </div>
+      <div id="frontQr_url" style="display:none">
+        <label>Info page URL (viewer.html) — where the QR sends people to view &amp; copy the details</label>
+        <input type="url" id="frontViewerBase" data-side="front" data-field="viewerBase" placeholder="Auto-fills to viewer.html next to this file">
+        <div class="note">This is the URL baked into the QR. It opens viewer.html with your Personal Details attached as a query string, so the finder sees a clean page they can tap-to-call / tap-to-email / copy from.</div>
+      </div>
+      <div id="frontQr_text" style="display:none">
+        <label>Plain text</label>
+        <textarea id="frontPlainText" data-side="front" data-field="text" rows="3"></textarea>
+      </div>
+      <div id="frontQr_wifi" style="display:none" class="row3">
+        <div><label>SSID</label><input type="text" id="frontWifiSSID" data-side="front" data-field="wifiSSID"></div>
+        <div><label>Password</label><input type="text" id="frontWifiPass" data-side="front" data-field="wifiPass"></div>
+        <div><label>Security</label><select id="frontWifiSec" data-side="front" data-field="wifiSec"><option value="WPA">WPA/WPA2</option><option value="WEP">WEP</option><option value="">None</option></select></div>
+      </div>
+      <div id="frontQr_vcard" style="display:none">
+        <div class="note">Builds an offline BEGIN:VCARD block straight from Personal Details above — no internet needed, and scanning it opens the phone's native "Add to Contacts" screen. Notes field includes an EN/ES/FR/DE recovery message plus the info-page URL below for more languages.</div>
+      </div>
+      <div id="frontQr_multilang" style="display:none">
+        <label>Languages shown alongside English (tick at least 5)</label>
+        <div class="pill-group" data-group="frontLang" data-multi="true">
+          <div class="pill on" data-lang="s">Spanish</div>
+          <div class="pill on" data-lang="f">French</div>
+          <div class="pill on" data-lang="d">German</div>
+          <div class="pill on" data-lang="i">Italian</div>
+          <div class="pill on" data-lang="p">Portuguese</div>
+          <div class="pill" data-lang="h">Hindi</div>
+          <div class="pill" data-lang="u">Punjabi</div>
+          <div class="pill" data-lang="a">Arabic</div>
+          <div class="pill" data-lang="c">Chinese</div>
+          <div class="pill" data-lang="j">Japanese</div>
+        </div>
+        <div class="note">Needs more room than a bare short URL, so this suits a bigger window — often the back, where there's more space. Contact values stay in their original form for accuracy; only field labels and the recovery message are translated.</div>
+        <div class="note" style="margin-top:10px;color:var(--text);font-weight:700">Live preview — what a finder sees after scanning</div>
+        <div id="frontMlQr" style="text-align:center;margin:8px 0"></div>
+        <div class="note" style="word-break:break-all" id="frontMlUrl"></div>
+        <label>Preview translated language</label>
+        <select id="frontMlPreviewLang"></select>
+        <div class="grid2" style="margin-top:8px">
+          <div>
+            <div class="note" style="font-weight:700;color:var(--text);margin-bottom:4px">Original (English)</div>
+            <div class="qr-capacity" id="frontMlOriginal" style="max-height:220px;overflow:auto"></div>
+          </div>
+          <div>
+            <div class="note" style="font-weight:700;color:var(--text);margin-bottom:4px" id="frontMlTranslatedTitle">Translated</div>
+            <div class="qr-capacity" id="frontMlTranslated" style="max-height:220px;overflow:auto"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn small" type="button" onclick="copyMlColumn('front','original')">Copy original</button>
+          <button class="btn small" type="button" onclick="copyMlColumn('front','translated')">Copy translated</button>
+        </div>
+      </div>
+      <label>Error correction level (for QR windows using this content)</label>
+      <select id="frontEc" data-side="front" data-field="ec">
+        <option value="L">L · Low (7%) — biggest data budget</option>
+        <option value="M" selected>M · Medium (15%) — recommended</option>
+        <option value="Q">Q · Quartile (25%)</option>
+        <option value="H">H · High (30%) — most robust, least data</option>
+      </select>
+    </section>
+
+    <section class="card" id="cardBack">
+      <h2 onclick="toggleCard(this)">5 · Back Tag <span class="chev">▾</span></h2>
+      <div class="chk"><input type="checkbox" id="backEnabled"><label for="backEnabled" style="margin:0">This design has a back</label></div>
+      <div id="backOptions" style="display:none">
+        <label>Fold direction — which edge of the front the back hinges from</label>
+        <div class="pill-group" data-group="backDirection">
+          <div class="pill" data-val="top">Top</div>
+          <div class="pill" data-val="bottom">Bottom</div>
+          <div class="pill" data-val="left">Left</div>
+          <div class="pill" data-val="right">Right</div>
+        </div>
+        <label>Fold allowance — gap between front &amp; back (mm)</label>
+        <input type="number" step="0.5" id="backGap" data-field="backGap" class="small-input">
+        <div class="note" style="margin-top:4px">A dashed line always marks the exact middle of this gap on screen as a fold guide. Whether that line actually prints is set in step 7 (Print Setup).</div>
+        <button class="btn small" style="margin:8px 0" onclick="mirrorFrontLayoutToBack()">⇄ Mirror front's outline to back</button>
+        <div class="note">A tag with a back is one continuous piece folded over — not two separately-cut pieces — so this mirrors the front's physical outline across the fold edge above (a true reflection, same as the "Mirror front windows to back" button below) rather than just cloning it. For a plain rectangle or circle this looks identical either way since they're symmetric; it only visibly matters once the outline has an asymmetric cut, like a chamfered corner. Doesn't touch windows, QR flags, or data. Add windows below with the buttons under "Back Windows," size and rotate them by dragging directly on the canvas (drag the shape to move, the small dot to rotate, the amber square at the corner to resize), then set each one's own content independently of the front.</div>
+        <button class="btn small" style="margin:8px 0" onclick="mirrorFrontWindowsToBack()">🪞 Mirror front windows to back</button>
+        <div class="note">Replaces ALL back windows with a mirror image of the front's windows, reflected across whichever edge is picked above as the fold direction — a window sitting close to the fold on the front ends up close to the fold on the back too (on that side's own near edge), and one far from the fold stays far on both. Position, size and rotation all mirror; each copy keeps its own QR flag, image, text and font — but on the back you still set that window's own content (QR type, text, etc.) independently of the front, same as always. This is a one-time snapshot, not a live link, and it overwrites whatever is currently on the back — it'll ask you to confirm first.</div>
+
+        <hr class="sep">
+        <label>Back Tag Shape</label>
+        <div class="pill-group" data-group="backShapeType">
+          <div class="pill" data-val="rect">Rectangle</div>
+          <div class="pill" data-val="square">Square</div>
+          <div class="pill" data-val="circle">Circle</div>
+          <div class="pill" data-val="polygon">Polygon</div>
+        </div>
+        <div id="backRectFields" class="row3">
+          <div><label>Width (mm)</label><input type="number" step="0.5" id="backW" data-side="back" data-field="w"></div>
+          <div><label>Height (mm)</label><input type="number" step="0.5" id="backH" data-side="back" data-field="h"></div>
+          <div><label>Corner radius (mm)</label><input type="number" step="0.5" id="backRx" data-side="back" data-field="rx"></div>
+        </div>
+        <div id="backCircleFields" class="row" style="display:none">
+          <div><label>Diameter (mm)</label><input type="number" step="0.5" id="backD" data-side="back" data-field="d"></div>
+        </div>
+        <div id="backPolyFields" style="display:none">
+          <label>Vertices — one "x,y" per line, mm (this panel's own bottom-left origin)</label>
+          <textarea id="backVerts" data-side="back" data-field="vertices" rows="4"></textarea>
+        </div>
+        <div class="chk"><input type="checkbox" id="backShapePrintBorder" data-side="back" data-field="shapePrintBorder"><label for="backShapePrintBorder" style="margin:0">Print this outline's border</label></div>
+
+        <hr class="sep">
+        <div id="addWindowBarBack" class="row3">
+          <button class="btn small" onclick="addWindow('back','rect')">+ Rect window</button>
+          <button class="btn small" onclick="addWindow('back','square')">+ Square window</button>
+          <button class="btn small" onclick="addWindow('back','circle')">+ Circle window</button>
+        </div>
+        <div id="backWindowList"></div>
+
+        <hr class="sep">
+        <div class="chk"><input type="checkbox" id="backSameDetails"><label for="backSameDetails" style="margin:0">Back uses the same Personal Details as front</label></div>
+        <div id="backPersonalWrap" style="display:none">
+          <div class="field-vis-table" id="backPersonalFields"></div>
+        </div>
+
+        <hr class="sep">
+        <div class="chk"><input type="checkbox" id="backSameQr"><label for="backSameQr" style="margin:0">Back QR window(s) copy the front's QR content</label></div>
+        <div id="backQrWrap" style="display:none">
+          <label>What the back QR(s) encode</label>
+          <select id="backQrType" data-side="back" data-field="qrType">
+            <option value="shortlink">🔗 Short URL only</option>
+            <option value="url">🏷 Personal Details — online page (needs internet)</option>
+            <option value="multilang">🌐 Multilingual page — pick 5+ languages (needs internet)</option>
+            <option value="vcard" selected>👤 vCard contact — fully offline</option>
+            <option value="text">📝 Plain text</option>
+            <option value="wifi">📶 WiFi network</option>
+          </select>
+          <div id="backQr_shortlink" style="display:none">
+            <label>Short URL</label>
+            <input type="url" id="backShortLink" data-side="back" data-field="shortLink">
+            <div class="note" id="backShortLinkWarn"></div>
+          </div>
+          <div id="backQr_url" style="display:none">
+            <label>Info page URL (viewer.html)</label>
+            <input type="url" id="backViewerBase" data-side="back" data-field="viewerBase">
+          </div>
+          <div id="backQr_text" style="display:none">
+            <label>Plain text</label>
+            <textarea id="backPlainText" data-side="back" data-field="text" rows="3"></textarea>
+          </div>
+          <div id="backQr_wifi" style="display:none" class="row3">
+            <div><label>SSID</label><input type="text" id="backWifiSSID" data-side="back" data-field="wifiSSID"></div>
+            <div><label>Password</label><input type="text" id="backWifiPass" data-side="back" data-field="wifiPass"></div>
+            <div><label>Security</label><select id="backWifiSec" data-side="back" data-field="wifiSec"><option value="WPA">WPA/WPA2</option><option value="WEP">WEP</option><option value="">None</option></select></div>
+          </div>
+          <div id="backQr_vcard">
+            <div class="note">Offline vCard, same construction as the front's vCard option, built from the Back Personal Details above (or the shared ones if "same as front" is on).</div>
+          </div>
+          <div id="backQr_multilang" style="display:none">
+            <label>Languages shown alongside English (tick at least 5)</label>
+            <div class="pill-group" data-group="backLang" data-multi="true">
+              <div class="pill on" data-lang="s">Spanish</div>
+              <div class="pill on" data-lang="f">French</div>
+              <div class="pill on" data-lang="d">German</div>
+              <div class="pill on" data-lang="i">Italian</div>
+              <div class="pill on" data-lang="p">Portuguese</div>
+              <div class="pill" data-lang="h">Hindi</div>
+              <div class="pill" data-lang="u">Punjabi</div>
+              <div class="pill" data-lang="a">Arabic</div>
+              <div class="pill" data-lang="c">Chinese</div>
+              <div class="pill" data-lang="j">Japanese</div>
+            </div>
+            <div class="note">This is usually the better fit for the back, where there's more room than the front's short-URL-sized QR. Contact values stay in their original form for accuracy; only field labels and the recovery message are translated.</div>
+            <div class="note" style="margin-top:10px;color:var(--text);font-weight:700">Live preview — what a finder sees after scanning</div>
+            <div id="backMlQr" style="text-align:center;margin:8px 0"></div>
+            <div class="note" style="word-break:break-all" id="backMlUrl"></div>
+            <label>Preview translated language</label>
+            <select id="backMlPreviewLang"></select>
+            <div class="grid2" style="margin-top:8px">
+              <div>
+                <div class="note" style="font-weight:700;color:var(--text);margin-bottom:4px">Original (English)</div>
+                <div class="qr-capacity" id="backMlOriginal" style="max-height:220px;overflow:auto"></div>
+              </div>
+              <div>
+                <div class="note" style="font-weight:700;color:var(--text);margin-bottom:4px" id="backMlTranslatedTitle">Translated</div>
+                <div class="qr-capacity" id="backMlTranslated" style="max-height:220px;overflow:auto"></div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn small" type="button" onclick="copyMlColumn('back','original')">Copy original</button>
+              <button class="btn small" type="button" onclick="copyMlColumn('back','translated')">Copy translated</button>
+            </div>
+          </div>
+          <label>Error correction level</label>
+          <select id="backEc" data-side="back" data-field="ec">
+            <option value="L">L · Low (7%)</option>
+            <option value="M" selected>M · Medium (15%) — recommended</option>
+            <option value="Q">Q · Quartile (25%)</option>
+            <option value="H">H · High (30%)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="cardQrSettings">
+      <h2 onclick="toggleCard(this)">6 · QR Scan-Reliability Settings <span class="chev">▾</span></h2>
+      <div class="row">
+        <div><label>Minimum module size (mm)</label><input type="number" step="0.05" id="minModule"></div>
+        <div><label>Quiet-zone margin (modules)</label><input type="number" step="1" id="quietModules"></div>
+      </div>
+      <div class="note">Every QR window reserves this many blank modules of solid white on all sides before any data modules are drawn, and the live capacity check (step 2) refuses to report a fit smaller than this module size — both defaults follow common print-scan-reliability guidance.</div>
+    </section>
+
+    <section class="card" id="cardPrint">
+      <h2 onclick="toggleCard(this)">7 · Print &amp; Save Setup <span class="chev">▾</span></h2>
+      <label>Paper mode</label>
+      <div class="pill-group" data-group="paperMode">
+        <div class="pill" data-val="virtual">Virtual paper (A6/A5/A4)</div>
+        <div class="pill" data-val="actual">Real / actual size (custom, fits the design exactly)</div>
+      </div>
+      <div id="virtualPaperFields">
+        <label>Paper size</label>
+        <div class="pill-group" data-group="paperSize">
+          <div class="pill" data-val="A6">A6 · 105 × 148 mm</div>
+          <div class="pill" data-val="A5">A5 · 148 × 210 mm</div>
+          <div class="pill" data-val="A4">A4 · 210 × 297 mm</div>
+        </div>
+        <label>Orientation</label>
+        <div class="pill-group" data-group="paperOrientation">
+          <div class="pill" data-val="portrait">Portrait</div>
+          <div class="pill" data-val="landscape">Landscape</div>
+        </div>
+        <label>Position on page</label>
+        <div class="pill-group" data-group="printPosition">
+          <div class="pill" data-val="topleft">Top-left corner</div>
+          <div class="pill" data-val="bottomright">Bottom-right corner</div>
+          <div class="pill" data-val="center">Centered</div>
+        </div>
+        <div class="note">Top-left uses the Top/Left margins below as the exact gap from the page edge to the tag. Bottom-right uses Bottom/Right the same way. Centered (the old default) ignores which corner and just centers the whole design in the printable area.</div>
+      </div>
+      <label>Margins (mm)</label>
+      <div class="row4">
+        <div><label style="margin-top:0">Top</label><input type="number" step="0.5" id="marginTop"></div>
+        <div><label style="margin-top:0">Bottom</label><input type="number" step="0.5" id="marginBottom"></div>
+        <div><label style="margin-top:0">Left</label><input type="number" step="0.5" id="marginLeft"></div>
+        <div><label style="margin-top:0">Right</label><input type="number" step="0.5" id="marginRight"></div>
+      </div>
+      <div class="note">"Real / actual size" builds a custom page sized exactly to your design plus these margins — no wasted paper, and no fixed A6/A5/A4 choice to worry about (handy for label printers or die-cut sheets). "Virtual paper" places the design on a standard page size instead, useful for printing on ordinary printer paper and cutting it out. Position on page only applies to Virtual paper — Real/actual size always fits the page exactly to the design, so there's no extra room to position within.</div>
+      <div class="chk"><input type="checkbox" id="showFoldLine"><label for="showFoldLine" style="margin:0">Print the fold-allowance line (dashed, marks the middle of the front/back gap)</label></div>
+      <div class="qr-capacity" id="printFitReadout">checking fit…</div>
+      <div class="note">Saved file names follow: Name_Virtual_PaperSize_Orientation.format (virtual paper) or Name_WxHmm_Orientation.format (real/actual size) — Name comes from Personal Details.</div>
+      <div class="note">The design prints at true 1:1 mm scale regardless of position setting — in the print dialog use "Actual size / 100%", not "Fit to page", or the physical QR module size will be wrong.</div>
+
+      <hr class="sep">
+      <label>PDF output scale correction (%)</label>
+      <input type="number" step="0.1" min="50" max="200" id="printScaleCorrection">
+      <div class="note">Only needed if the app or printer you open the PDF in silently shrinks/scales pages itself (some label-printer apps do this with no way to turn it off — the PDF page size is still exactly right, but the app re-scales it on its way to the printer regardless). Leave at 100% normally. If your printed output measures smaller than designed, measure the actual printed width in mm, then set this to (intended width ÷ measured width) × 100 — e.g. if 86mm printed as 79mm, set it to 108.9%. This inflates the PDF's own declared page size by that amount (content stays proportioned exactly as designed) so the external app's shrink lands you back on the true size. Only affects the PDF download, not Print/JPG/PNG.</div>
+    </section>
+
+  </div>
+
+  <div id="preview-wrap">
+    <div id="preview-toolbar">
+      <span class="help-inline">Drag a shape to move it · drag the small dot to rotate · drag the amber square to resize · click to select, then use arrow keys to nudge (Shift = fine)</span>
+      <div class="sp"></div>
+      <span class="help-inline" id="zoomReadout"></span>
+    </div>
+    <div id="stage-holder">
+      <svg id="stage" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</main>
+
+<div id="qrHidden" style="position:absolute; left:-9999px; top:-9999px"></div>
+<svg id="printStage" xmlns="http://www.w3.org/2000/svg"></svg>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+var G = {
+  minModule: 0.35,
+  quietModules: 4,
+  // Chamfered-corner tag outline (86 x 46mm): top edge chopped a bit from the left (starts
+  // at x=18 instead of x=0), left edge chopped from the top down to the middle (starts at
+  // y=23 instead of y=46), the two cut points joined by a diagonal — a top-left chamfer.
+  // Back's outline is this front shape's TRUE mirror reflection across the fold (front's
+  // bottom edge, since backDirection is 'bottom' below) — computed with reflectShapeAcrossFold,
+  // which flips it into a bottom-left chamfer: [[0,46],[86,46],[86,0],[18,0],[0,23]]. A folded
+  // single-piece tag's two faces are mirror images of each other in the flat/pre-fold layout,
+  // not identical copies, once the outline has any asymmetric cut like this one.
+  front: { shape:{type:'polygon', w:86, h:46, rx:0, d:46, vertices:[[0,0],[86,0],[86,46],[18,46],[0,23]], printBorder:true}, windows:[] },
+  backEnabled: true,
+  backDirection: 'bottom',
+  backGap: 3,
+  back: { shape:{type:'polygon', w:86, h:46, rx:0, d:46, vertices:[[0,46],[86,46],[86,0],[18,0],[0,23]], printBorder:true}, windows:[] },
+  personal: defaultPersonal(),
+  backSameDetails: true,
+  backPersonal: emptyPersonal(),
+  // Off by default now: front encodes a short URL, back encodes its own multilingual page —
+  // they're deliberately different content, so back must use its own G.qr.back config
+  // instead of silently mirroring the front's.
+  backSameQr: false,
+  // scaleCorrectionPct default of 109.2 is a first-pass estimate from your reported Phomemo
+  // measurement (86mm designed -> 79mm printed, 46mm -> 42mm; average ratio 1.092). Re-measure
+  // your next print with an actual ruler and adjust this number if it's not exact yet — it's
+  // a starting point, not a guaranteed-precise calibration from a single rough measurement.
+  print: { mode:'virtual', paper:'A5', orientation:'portrait', position:'topleft', marginTop:10, marginBottom:10, marginLeft:5, marginRight:5, showFoldLine:true, scaleCorrectionPct:109.2 },
+  qr: {
+    front: {type:'shortlink', shortLink:'https://as-icloud.github.io/LTag/info-ankitsrivastava.html', viewerBase:'', text:'', wifiSSID:'', wifiPass:'', wifiSec:'WPA', ec:'M',
+      langs:{s:true,f:true,d:true,i:true,p:true,h:false,u:false,a:false,c:false,j:false}},
+    back:  {type:'multilang', shortLink:'', viewerBase:'', text:'', wifiSSID:'', wifiPass:'', wifiSec:'WPA', ec:'M',
+      langs:{s:true,f:true,d:true,i:true,p:true,h:false,u:false,a:false,c:false,j:false}}
+  },
+  selected: null,   // {side,id}
+  dragging: null,
+  nextId: 1
+};
+
+function emptyPersonal(){
+  return {
+    name:'', org:'', address:'', address2:'', mobile:'', mobile2:'', phone:'', phone2:'',
+    whatsapp:'', whatsapp2:'', email:'', email2:'', notes:'',
+    show:{name:true,org:true,address:true,address2:true,mobile:true,mobile2:true,phone:true,phone2:true,whatsapp:true,whatsapp2:true,email:true,email2:true,notes:true}
+  };
+}
+// Pre-filled starting values so the app opens ready to use instead of blank — edit or
+// clear any field as needed, or click "Restore sample data" to bring these back later.
+function sampleFieldValues(){
+  return {
+    name:'Ankit Srivastava', org:'',
+    address:'B/1\n9 Queens Crescent\nGlasgow, UK\nG4 9BW',
+    address2:'KSkin\n11 Ingram Street\nGlasgow, UK\nG1 1HA',
+    mobile:'+44 (0) 77 62 60 94 90', mobile2:'',
+    phone:'+44 (0) 141 55 25 022', phone2:'',
+    whatsapp:'+44 (0) 77 62 60 94 90', whatsapp2:'',
+    email:'a_srivastava@icloud.com', email2:'home9crescent@gmail.com',
+    notes:'Please contact us via WhatsApp or email if you have found this luggage.'
+  };
+}
+function defaultPersonal(){
+  var p = emptyPersonal();
+  var sample = sampleFieldValues();
+  Object.keys(sample).forEach(function(k){ p[k]=sample[k]; });
+  return p;
+}
+
+var PERSONAL_FIELD_DEFS = [
+  ['name','Name','text'],['org','Organisation','text'],
+  ['address','Address 1','textarea'],['address2','Address 2','textarea'],
+  ['mobile','Mobile 1','text'],['mobile2','Mobile 2','text'],
+  ['phone','Telephone 1','text'],['phone2','Telephone 2','text'],
+  ['whatsapp','WhatsApp 1','text'],['whatsapp2','WhatsApp 2','text'],
+  ['email','Email 1','text'],['email2','Email 2','text'],
+  ['notes','Notes','textarea']
+];
+
+// ══════════════════════════════════════════════════════════════
+//  QR CAPACITY TABLE (ISO/IEC 18004 byte-mode data capacity, v1-40)
+// ══════════════════════════════════════════════════════════════
+var QR_CAPACITY = [
+[1,21,17,14,11,7],[2,25,32,26,20,14],[3,29,53,42,32,24],[4,33,78,62,46,34],
+[5,37,106,84,60,44],[6,41,134,106,74,58],[7,45,154,122,86,64],[8,49,192,152,108,84],
+[9,53,230,180,130,98],[10,57,271,213,151,119],[11,61,321,251,177,137],[12,65,367,287,203,155],
+[13,69,425,331,241,177],[14,73,458,362,258,194],[15,77,520,412,292,220],[16,81,586,450,322,250],
+[17,85,644,504,364,280],[18,89,718,560,394,310],[19,93,792,624,442,338],[20,97,858,666,482,382],
+[21,101,929,711,509,403],[22,105,1003,779,565,439],[23,109,1091,857,611,461],[24,113,1171,911,661,511],
+[25,117,1273,997,715,535],[26,121,1367,1059,751,593],[27,125,1465,1125,805,625],[28,129,1528,1190,868,658],
+[29,133,1628,1264,908,698],[30,137,1732,1370,982,742],[31,141,1840,1452,1030,790],[32,145,1952,1538,1112,842],
+[33,149,2068,1628,1168,898],[34,153,2188,1722,1228,958],[35,157,2303,1809,1283,983],[36,161,2431,1911,1351,1051],
+[37,165,2563,1989,1423,1093],[38,169,2699,2099,1499,1139],[39,173,2809,2213,1579,1219],[40,177,2953,2331,1663,1273]
+];
+var EC_COL = {L:2,M:3,Q:4,H:5};
+
+function maxModulesForSide(sideMm, quietModules, minModuleMm){
+  var quietMm = quietModules*minModuleMm;
+  var usableMm = sideMm - 2*quietMm;
+  if(usableMm<=0) return 0;
+  return Math.floor(usableMm/minModuleMm);
+}
+function capacityForSide(sideMm, ec, minModuleMm, quietModules){
+  var maxModules = maxModulesForSide(sideMm, quietModules, minModuleMm);
+  var best=null;
+  for(var i=0;i<QR_CAPACITY.length;i++){
+    var row=QR_CAPACITY[i];
+    if(row[1]<=maxModules) best=row; else break;
+  }
+  if(!best) return {version:0,modules:0,capacity:0,maxModules:maxModules};
+  return {version:best[0],modules:best[1],capacity:best[EC_COL[ec]],maxModules:maxModules};
+}
+function capacityAllLevels(sideMm, minModuleMm, quietModules){
+  var out={};
+  ['L','M','Q','H'].forEach(function(ec){ out[ec]=capacityForSide(sideMm,ec,minModuleMm,quietModules); });
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  GEOMETRY — bottom-left-origin, Y-up mm space per panel;
+//  SVG stage itself is a plain y-down mm space (1 svg unit = 1 mm)
+// ══════════════════════════════════════════════════════════════
+function shapeBBox(shape){
+  if(shape.type==='circle') return {w:shape.d, h:shape.d};
+  if(shape.type==='polygon'){
+    var maxX=0,maxY=0;
+    (shape.vertices||[]).forEach(function(p){ if(p[0]>maxX)maxX=p[0]; if(p[1]>maxY)maxY=p[1]; });
+    return {w:maxX||1, h:maxY||1};
+  }
+  return {w:shape.w, h:shape.h};
+}
+
+function getPanelOrigins(){
+  var f = shapeBBox(G.front.shape);
+  var origins = { front:{ox:0,oy:0,w:f.w,h:f.h} };
+  if(G.backEnabled){
+    var b = shapeBBox(G.back.shape);
+    var gap = G.backGap;
+    var ox,oy;
+    if(G.backDirection==='top'){ ox = (f.w-b.w)/2; oy = -gap-b.h; }
+    else if(G.backDirection==='bottom'){ ox = (f.w-b.w)/2; oy = f.h+gap; }
+    else if(G.backDirection==='left'){ ox = -gap-b.w; oy = (f.h-b.h)/2; }
+    else { ox = f.w+gap; oy = (f.h-b.h)/2; } // right
+    origins.back = {ox:ox, oy:oy, w:b.w, h:b.h};
+  }
+  return origins;
+}
+
+// panel-local Y-up mm  ->  global svg (y-down) mm
+function toSvg(localX, localY, origin){
+  return { x: origin.ox+localX, y: origin.oy + (origin.h-localY) };
+}
+// global svg (y-down) mm  ->  panel-local Y-up mm
+function fromSvg(svgX, svgY, origin){
+  return { x: svgX-origin.ox, y: origin.h-(svgY-origin.oy) };
+}
+function pointInPanel(svgX, svgY, origin){
+  var lx=svgX-origin.ox, ly=svgY-origin.oy;
+  return lx>=0 && lx<=origin.w && ly>=0 && ly<=origin.h;
+}
+
+function windowBBoxLocal(win){
+  if(win.shape==='circle'){
+    var d=win.r*2, cx,cy;
+    if(win.posMode==='center'){ cx=win.x; cy=win.y; } else { cx=win.x+win.r; cy=win.y+win.r; }
+    return {cx:cx, cy:cy, w:d, h:d};
+  }
+  var w=win.w, h=win.h, cx,cy;
+  if(win.posMode==='center'){ cx=win.x; cy=win.y; } else { cx=win.x+w/2; cy=win.y+h/2; }
+  return {cx:cx, cy:cy, w:w, h:h};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  vCard / content builders
+// ══════════════════════════════════════════════════════════════
+function vcardEsc(s){
+  return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+}
+function fieldVal(p, key){ return (p[key]||'').trim(); }
+function fieldShown(p, key){ return !!(p.show && p.show[key]); }
+
+function buildVCard(p, infoUrl){
+  var name = fieldVal(p,'name');
+  if(!name) return null;
+  var vc=['BEGIN:VCARD','VERSION:3.0'];
+  vc.push('FN:'+vcardEsc(name));
+  vc.push('N:'+vcardEsc(name)+';;;;');
+  if(fieldVal(p,'org') && fieldShown(p,'org')) vc.push('ORG:'+vcardEsc(fieldVal(p,'org')));
+  if(fieldVal(p,'mobile') && fieldShown(p,'mobile'))   vc.push('TEL;TYPE=CELL:'+vcardEsc(fieldVal(p,'mobile')));
+  if(fieldVal(p,'mobile2') && fieldShown(p,'mobile2')) vc.push('TEL;TYPE=CELL:'+vcardEsc(fieldVal(p,'mobile2')));
+  if(fieldVal(p,'phone') && fieldShown(p,'phone'))     vc.push('TEL;TYPE=HOME,VOICE:'+vcardEsc(fieldVal(p,'phone')));
+  if(fieldVal(p,'phone2') && fieldShown(p,'phone2'))   vc.push('TEL;TYPE=HOME,VOICE:'+vcardEsc(fieldVal(p,'phone2')));
+  if(fieldVal(p,'whatsapp') && fieldShown(p,'whatsapp') && fieldVal(p,'whatsapp')!==fieldVal(p,'mobile'))
+    vc.push('TEL;TYPE=CELL:'+vcardEsc(fieldVal(p,'whatsapp')));
+  if(fieldVal(p,'whatsapp2') && fieldShown(p,'whatsapp2') && fieldVal(p,'whatsapp2')!==fieldVal(p,'mobile2'))
+    vc.push('TEL;TYPE=CELL:'+vcardEsc(fieldVal(p,'whatsapp2')));
+  if(fieldVal(p,'email') && fieldShown(p,'email'))   vc.push('EMAIL;TYPE=INTERNET:'+vcardEsc(fieldVal(p,'email')));
+  if(fieldVal(p,'email2') && fieldShown(p,'email2')) vc.push('EMAIL;TYPE=INTERNET:'+vcardEsc(fieldVal(p,'email2')));
+  // vCard's own escaping (vcardEsc, above) already turns a real line break into the
+  // spec's literal "\n" escape sequence, which Contacts apps render back as an actual
+  // line break — so the address keeps the exact lines you typed instead of being
+  // squashed onto one comma-separated line.
+  if(fieldVal(p,'address') && fieldShown(p,'address'))
+    vc.push('ADR;TYPE=HOME:;;'+vcardEsc(fieldVal(p,'address'))+';;;;');
+  if(fieldVal(p,'address2') && fieldShown(p,'address2'))
+    vc.push('ADR;TYPE=WORK:;;'+vcardEsc(fieldVal(p,'address2'))+';;;;');
+  if(infoUrl) vc.push('URL:'+infoUrl);
+  var noteParts=[];
+  if(fieldVal(p,'whatsapp') && fieldShown(p,'whatsapp'))   noteParts.push('WhatsApp: '+fieldVal(p,'whatsapp'));
+  if(fieldVal(p,'whatsapp2') && fieldShown(p,'whatsapp2')) noteParts.push('WhatsApp 2: '+fieldVal(p,'whatsapp2'));
+  if(fieldVal(p,'notes') && fieldShown(p,'notes')) noteParts.push(fieldVal(p,'notes'));
+  noteParts.push('EN - If you found this bag, please contact the owner above. Thank you!');
+  noteParts.push('ES - Si ha encontrado este equipaje, por favor contacte al propietario indicado arriba. \u00a1Gracias!');
+  noteParts.push('FR - Si vous avez trouv\u00e9 ce bagage, merci de contacter le propri\u00e9taire ci-dessus. Merci !');
+  noteParts.push('DE - Wenn Sie dieses Gep\u00e4ckst\u00fcck gefunden haben, kontaktieren Sie bitte den oben genannten Eigent\u00fcmer. Danke!');
+  if(infoUrl) noteParts.push('More languages: '+infoUrl);
+  vc.push('NOTE:'+vcardEsc(noteParts.join('\n')));
+  vc.push('END:VCARD');
+  return vc.join('\n');
+}
+
+// The "?d=...=" data string is itself one line per field, so a real line break inside
+// a field's own value (e.g. a 4-line address) would look like the start of a brand new
+// field once decoded. We encode an embedded line break as the literal two characters
+// "\n" (matching vCard's own escaping convention) so it survives the round trip intact;
+// viewer.html / multilingual.html turn that back into a real line break for display.
+function encodeFieldValue(v){ return v.replace(/\n/g,'\\n'); }
+
+function personalDataLines(p){
+  var lines=[];
+  PERSONAL_FIELD_DEFS.forEach(function(def){
+    var key=def[0];
+    var v=fieldVal(p,key);
+    if(v && fieldShown(p,key)) lines.push(key+': '+encodeFieldValue(v));
+  });
+  return lines;
+}
+
+function buildOnlineUrl(p, viewerBase){
+  var base = (viewerBase||'').trim() || new URL('viewer.html', window.location.href).href;
+  var data = personalDataLines(p).join('\n');
+  return data ? base+'?d='+encodeURIComponent(data) : base;
+}
+
+function langCodesFrom(langsObj){
+  return 'sfdiphuacj'.split('').filter(function(c){ return langsObj && langsObj[c]; });
+}
+
+function buildMultilangUrl(p, cfg){
+  var codes = langCodesFrom(cfg.langs);
+  if(codes.length < 5) return null;
+  var base = new URL('multilingual.html', window.location.href).href;
+  var dataStr = personalDataLines(p).join('\n');
+  var url = base + '?';
+  if(dataStr) url += 'd='+encodeURIComponent(dataStr)+'&';
+  url += 'l='+codes.join('');
+  return url;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Multilingual preview data — same labels/message translations as multilingual.html,
+// kept here too so the "live preview" columns can render without an iframe.
+// ══════════════════════════════════════════════════════════════
+var LANGS = {
+  en:{title:'English / Original', name:'Name', org:'Organisation', address:'Address', mobile:'Mobile', phone:'Telephone', whatsapp:'WhatsApp', email:'Email', notes:'Notes',
+    message:'If you found this bag, please contact the owner using the details on this page. Thank you!'},
+  es:{title:'Español', name:'Nombre', org:'Organización', address:'Dirección', mobile:'Móvil', phone:'Teléfono', whatsapp:'WhatsApp', email:'Correo electrónico', notes:'Nota',
+    message:'Si ha encontrado este equipaje, por favor contacte al propietario usando los datos de esta página. ¡Gracias!'},
+  fr:{title:'Français', name:'Nom', org:'Organisation', address:'Adresse', mobile:'Portable', phone:'Téléphone', whatsapp:'WhatsApp', email:'E-mail', notes:'Remarque',
+    message:'Si vous avez trouvé ce bagage, merci de contacter le propriétaire grâce aux coordonnées de cette page. Merci !'},
+  de:{title:'Deutsch', name:'Name', org:'Organisation', address:'Adresse', mobile:'Mobiltelefon', phone:'Telefon', whatsapp:'WhatsApp', email:'E-Mail', notes:'Hinweis',
+    message:'Wenn Sie dieses Gepäck gefunden haben, kontaktieren Sie bitte den Eigentümer über die Angaben auf dieser Seite. Danke!'},
+  it:{title:'Italiano', name:'Nome', org:'Organizzazione', address:'Indirizzo', mobile:'Cellulare', phone:'Telefono', whatsapp:'WhatsApp', email:'E-mail', notes:'Nota',
+    message:'Se hai trovato questo bagaglio, contatta il proprietario usando i dati di questa pagina. Grazie!'},
+  pt:{title:'Português', name:'Nome', org:'Organização', address:'Endereço', mobile:'Telemóvel', phone:'Telefone', whatsapp:'WhatsApp', email:'E-mail', notes:'Nota',
+    message:'Se encontrou esta bagagem, contacte o proprietário usando os dados desta página. Obrigado!'},
+  hi:{title:'हिन्दी', name:'नाम', org:'संगठन', address:'पता', mobile:'मोबाइल', phone:'टेलीफ़ोन', whatsapp:'व्हाट्सऐप', email:'ईमेल', notes:'नोट',
+    message:'यदि आपको यह सामान मिला है, तो कृपया इस पृष्ठ पर दिए विवरण से मालिक से संपर्क करें। धन्यवाद!'},
+  pa:{title:'ਪੰਜਾਬੀ', name:'ਨਾਮ', org:'ਸੰਗਠਨ', address:'ਪਤਾ', mobile:'ਮੋਬਾਈਲ', phone:'ਟੈਲੀਫ਼ੋਨ', whatsapp:'WhatsApp', email:'ਈਮੇਲ', notes:'ਨੋਟ',
+    message:'ਜੇ ਤੁਹਾਨੂੰ ਇਹ ਸਮਾਨ ਮਿਲਿਆ ਹੈ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਪੰਨੇ \'ਤੇ ਦਿੱਤੇ ਵੇਰਵਿਆਂ ਰਾਹੀਂ ਮਾਲਕ ਨਾਲ ਸੰਪਰਕ ਕਰੋ। ਧੰਨਵਾਦ!'},
+  ar:{title:'العربية', name:'الاسم', org:'المؤسسة', address:'العنوان', mobile:'الهاتف المحمول', phone:'الهاتف', whatsapp:'واتساب', email:'البريد الإلكتروني', notes:'ملاحظة',
+    message:'إذا عثرت على هذه الأمتعة، يرجى التواصل مع المالك باستخدام البيانات الموجودة في هذه الصفحة. شكرًا لك!'},
+  zh:{title:'简体中文', name:'姓名', org:'机构', address:'地址', mobile:'手机', phone:'电话', whatsapp:'WhatsApp', email:'电子邮箱', notes:'备注',
+    message:'如您找到这件行李，请通过本页信息联系失主。谢谢！'},
+  ja:{title:'日本語', name:'氏名', org:'組織', address:'住所', mobile:'携帯電話', phone:'電話', whatsapp:'WhatsApp', email:'メール', notes:'メモ',
+    message:'この荷物を見つけた場合は、このページの情報を使って持ち主にご連絡ください。ありがとうございます！'}
+};
+var LANG_CODE_MAP = {s:'es',f:'fr',d:'de',i:'it',p:'pt',h:'hi',u:'pa',a:'ar',c:'zh',j:'ja'};
+var ML_FIELD_ORDER = [
+  ['name','name',''],['org','org',''],
+  ['address','address',' 1'],['address2','address',' 2'],
+  ['mobile','mobile',' 1'],['mobile2','mobile',' 2'],
+  ['phone','phone',' 1'],['phone2','phone',' 2'],
+  ['whatsapp','whatsapp',' 1'],['whatsapp2','whatsapp',' 2'],
+  ['email','email',' 1'],['email2','email',' 2'],
+  ['notes','notes','']
+];
+
+// ══════════════════════════════════════════════════════════════
+// Live "what a finder sees" preview for the Multilingual QR content type —
+// mini QR + destination URL + Original/Translated columns + copy buttons.
+// ══════════════════════════════════════════════════════════════
+function mlMiniQrSVG(content, ec){
+  var mx = getQrMatrix(content, ec||'M');
+  if(!mx) return '<span class="note">QR preview unavailable (library still loading — try again in a moment).</span>';
+  var n = mx.n, size = 120, moduleSize = size/n, d='';
+  for(var r=0;r<n;r++){
+    for(var c=0;c<n;c++){
+      if(mx.matrix[r][c]) d += 'M'+(c*moduleSize)+' '+(r*moduleSize)+'h'+moduleSize+'v'+moduleSize+'h'+(-moduleSize)+'z';
+    }
+  }
+  return '<svg width="120" height="120" viewBox="0 0 '+size+' '+size+'" style="background:#fff;border-radius:8px"><path d="'+d+'" fill="#000"/></svg>';
+}
+
+function mlColumnHtml(langCode, p){
+  var t = LANGS[langCode];
+  var html = '', any = false;
+  ML_FIELD_ORDER.forEach(function(f){
+    var key=f[0], labelKey=f[1], suffix=f[2];
+    var v = fieldVal(p,key);
+    if(!v || !fieldShown(p,key)) return;
+    any = true;
+    html += '<div style="margin-bottom:6px"><b>'+esc(t[labelKey]+suffix)+':</b> '+esc(v).replace(/\n/g,'<br>')+'</div>';
+  });
+  if(!any) html = '<span class="note">No fields are ticked "in QR" yet — see Personal Details above.</span>';
+  html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-style:italic">'+esc(t.message)+'</div>';
+  return html;
+}
+
+function renderMlColumns(side){
+  var origEl = document.getElementById(side+'MlOriginal');
+  if(!origEl) return;
+  var p = resolveQrConfig(side).personal;
+  var selEl = document.getElementById(side+'MlPreviewLang');
+  var transTitleEl = document.getElementById(side+'MlTranslatedTitle');
+  origEl.innerHTML = mlColumnHtml('en', p);
+  var lang = (selEl && selEl.value) || 'es';
+  transTitleEl.textContent = 'Translated (' + (LANGS[lang] ? LANGS[lang].title : lang) + ')';
+  document.getElementById(side+'MlTranslated').innerHTML = mlColumnHtml(lang, p);
+}
+
+function updateMlPreview(side){
+  if(!G.qr[side] || G.qr[side].type!=='multilang') return;
+  var cfg = G.qr[side];
+  var urlEl = document.getElementById(side+'MlUrl');
+  if(!urlEl) return; // HTML not built yet (very first call before init finishes)
+  var qrEl = document.getElementById(side+'MlQr');
+  var selEl = document.getElementById(side+'MlPreviewLang');
+
+  var codes = langCodesFrom(cfg.langs);
+  if(codes.length < 5){
+    urlEl.innerHTML = '<span style="color:var(--red)">Tick at least 5 languages above to generate the QR and preview.</span>';
+    qrEl.innerHTML=''; selEl.innerHTML='';
+    document.getElementById(side+'MlOriginal').innerHTML='';
+    document.getElementById(side+'MlTranslated').innerHTML='';
+    return;
+  }
+  var p = resolveQrConfig(side).personal;
+  var url = buildMultilangUrl(p, cfg);
+  urlEl.textContent = url;
+  qrEl.innerHTML = mlMiniQrSVG(url, cfg.ec);
+
+  var prevVal = selEl.value;
+  var fullCodes = codes.map(function(c){ return LANG_CODE_MAP[c]; });
+  selEl.innerHTML = fullCodes.map(function(full){ return '<option value="'+full+'">'+LANGS[full].title+'</option>'; }).join('');
+  selEl.value = fullCodes.indexOf(prevVal)>=0 ? prevVal : fullCodes[0];
+  selEl.onchange = function(){ renderMlColumns(side); };
+
+  renderMlColumns(side);
+}
+
+function copyMlColumn(side, which){
+  var p = resolveQrConfig(side).personal;
+  var selEl = document.getElementById(side+'MlPreviewLang');
+  var lang = which==='original' ? 'en' : ((selEl && selEl.value) || 'es');
+  var t = LANGS[lang];
+  var lines = [];
+  ML_FIELD_ORDER.forEach(function(f){
+    var key=f[0], labelKey=f[1], suffix=f[2];
+    var v = fieldVal(p,key);
+    if(v && fieldShown(p,key)) lines.push((t[labelKey]+suffix)+': '+v);
+  });
+  lines.push(t.message);
+  var text = lines.join('\n');
+  function done(){
+    var el = document.getElementById(side+'MlUrl');
+    if(!el) return;
+    var old = el.textContent;
+    el.textContent = 'Copied to clipboard ✓';
+    setTimeout(function(){ el.textContent = old; }, 1400);
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done);
+  } else {
+    var ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    ta.remove();
+    done();
+  }
+}
+
+function resolveQrConfig(side){
+  if(side==='back' && G.backSameQr) return {cfg:G.qr.front, personal: G.backSameDetails ? G.personal : G.backPersonal, srcSide:'front'};
+  var personal = side==='back' ? (G.backSameDetails ? G.personal : G.backPersonal) : G.personal;
+  return {cfg:G.qr[side], personal:personal, srcSide:side};
+}
+
+function buildQrContent(side){
+  var r = resolveQrConfig(side);
+  var cfg=r.cfg, p=r.personal;
+  if(cfg.type==='shortlink'){
+    var l=(cfg.shortLink||'').trim();
+    return /^https?:\/\//i.test(l) ? l : null;
+  }
+  if(cfg.type==='url') return buildOnlineUrl(p, cfg.viewerBase);
+  if(cfg.type==='multilang') return buildMultilangUrl(p, cfg);
+  if(cfg.type==='text') return (cfg.text||'').trim() || null;
+  if(cfg.type==='wifi'){
+    if(!(cfg.wifiSSID||'').trim()) return null;
+    return 'WIFI:T:'+(cfg.wifiSec||'')+';S:'+cfg.wifiSSID+';P:'+(cfg.wifiPass||'')+';;';
+  }
+  if(cfg.type==='vcard'){
+    var infoUrl=(cfg.viewerBase||'').trim() || (cfg.shortLink||'').trim() || '';
+    return buildVCard(p, infoUrl);
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  QR MODULE MATRIX (via qrcodejs, read synchronously)
+// ══════════════════════════════════════════════════════════════
+var qrMatrixCache = {};
+function getQrMatrix(content, ec){
+  if(!content || typeof QRCode==='undefined') return null;
+  var key = ec+'|'+content;
+  if(qrMatrixCache[key]) return qrMatrixCache[key];
+  var hid=document.getElementById('qrHidden');
+  hid.innerHTML='';
+  try{
+    var q=new QRCode(hid,{text:content, width:256, height:256, correctLevel:QRCode.CorrectLevel[ec]});
+    var oq=q._oQRCode;
+    if(!oq || !oq.getModuleCount) return null;
+    var n=oq.getModuleCount();
+    var matrix=[];
+    for(var r=0;r<n;r++){ var row=[]; for(var c=0;c<n;c++){ row.push(oq.isDark(r,c)); } matrix.push(row); }
+    var result={n:n, matrix:matrix};
+    qrMatrixCache[key]=result;
+    return result;
+  }catch(e){ return null; }
+}
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════════════
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function shapeOutlineSVG(shape, origin, cls){
+  var svgW=origin.w, svgH=origin.h;
+  cls = cls + (shape.printBorder===false ? ' border-off' : '');
+  if(shape.type==='circle'){
+    return '<circle class="tag-outline '+cls+'" cx="'+(origin.ox+svgW/2)+'" cy="'+(origin.oy+svgH/2)+'" r="'+(shape.d/2)+'"/>';
+  }
+  if(shape.type==='polygon'){
+    var pts=(shape.vertices||[]).map(function(p){ var s=toSvg(p[0],p[1],origin); return s.x+','+s.y; }).join(' ');
+    return '<polygon class="tag-outline '+cls+'" points="'+pts+'"/>';
+  }
+  var rx = shape.rx||0;
+  return '<rect class="tag-outline '+cls+'" x="'+origin.ox+'" y="'+origin.oy+'" width="'+svgW+'" height="'+svgH+'" rx="'+rx+'" ry="'+rx+'"/>';
+}
+
+// Print version of the outer tag outline: fill stays white (so any content behind it is
+// legible), but the border stroke only appears if this shape's own "print border" is on.
+function shapeOutlinePrintSVG(shape, origin){
+  var style = 'fill:#fff;stroke:'+(shape.printBorder?'#000':'none')+';stroke-width:0.3';
+  var svgW=origin.w, svgH=origin.h;
+  if(shape.type==='circle'){
+    return '<circle cx="'+(origin.ox+svgW/2)+'" cy="'+(origin.oy+svgH/2)+'" r="'+(shape.d/2)+'" style="'+style+'"/>';
+  }
+  if(shape.type==='polygon'){
+    var pts=(shape.vertices||[]).map(function(p){ var s=toSvg(p[0],p[1],origin); return s.x+','+s.y; }).join(' ');
+    return '<polygon points="'+pts+'" style="'+style+'"/>';
+  }
+  var rx = shape.rx||0;
+  return '<rect x="'+origin.ox+'" y="'+origin.oy+'" width="'+svgW+'" height="'+svgH+'" rx="'+rx+'" ry="'+rx+'" style="'+style+'"/>';
+}
+
+function fontFamilyCss(f){
+  var map={system:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif', arial:'Arial,Helvetica,sans-serif', georgia:'Georgia,serif', courier:'"Courier New",monospace', times:'"Times New Roman",serif'};
+  return map[f]||map.system;
+}
+
+function renderTextSVG(win, x, y, w, h){
+  if(!win.text) return '';
+  var f=win.font;
+  var lines=String(win.text).split('\n');
+  var lineH=f.size*1.25;
+  var totalH=lines.length*lineH;
+  var anchor = f.align==='left'?'start':(f.align==='right'?'end':'middle');
+  var tx = f.align==='left' ? (x+0.6) : (f.align==='right' ? (x+w-0.6) : (x+w/2));
+  var startY = y + h/2 - totalH/2 + lineH*0.8;
+  var style='font-family:'+fontFamilyCss(f.family)+';font-size:'+f.size+'px;font-weight:'+f.weight+';font-style:'+f.style+';fill:'+f.color+';';
+  var tspans = lines.map(function(ln,i){
+    return '<tspan x="'+tx+'" y="'+(startY+i*lineH)+'">'+esc(ln)+'</tspan>';
+  }).join('');
+  return '<text text-anchor="'+anchor+'" style="'+style+'">'+tspans+'</text>';
+}
+
+function renderImageSVG(win, x, y, w, h){
+  if(!win.image) return '';
+  return '<image href="'+win.image+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" preserveAspectRatio="xMidYMid meet"/>';
+}
+
+function renderTextImageContent(win, x, y, w, h){
+  var hasImg = !!win.image, hasText = !!win.text;
+  if(hasImg && hasText && win.textPos==='over'){
+    return renderImageSVG(win,x,y,w,h) + renderTextSVG(win,x,y,w,h);
+  }
+  if(hasImg && hasText){
+    var tp=win.textPos;
+    if(tp==='top') return renderTextSVG(win,x,y,w,h*0.32) + renderImageSVG(win,x,y+h*0.32,w,h*0.68);
+    if(tp==='bottom') return renderImageSVG(win,x,y,w,h*0.68) + renderTextSVG(win,x,y+h*0.68,w,h*0.32);
+    if(tp==='left') return renderTextSVG(win,x,y,w*0.4,h) + renderImageSVG(win,x+w*0.4,y,w*0.6,h);
+    return renderImageSVG(win,x,y,w*0.6,h) + renderTextSVG(win,x+w*0.6,y,w*0.4,h);
+  }
+  if(hasImg) return renderImageSVG(win,x,y,w,h);
+  if(hasText) return renderTextSVG(win,x,y,w,h);
+  return '';
+}
+
+function renderQrContent(win, x, y, w, h, side){
+  var content = buildQrContent(side);
+  var ec = resolveQrConfig(side).cfg.ec || 'M';
+  var S = Math.min(w,h);
+  if(!content){
+    return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="none" stroke="'+'#f87171'+'" stroke-dasharray="1,1" stroke-width=".3"/>'+
+      '<text x="'+(x+w/2)+'" y="'+(y+h/2)+'" text-anchor="middle" style="font-size:2.6px;fill:#f87171;font-family:sans-serif">No QR content</text>';
+  }
+  var mx = getQrMatrix(content, ec);
+  if(!mx){
+    return '<text x="'+(x+w/2)+'" y="'+(y+h/2)+'" text-anchor="middle" style="font-size:2.6px;fill:#f87171">QR lib not loaded</text>';
+  }
+  var n = mx.n;
+  var moduleSize = S/(2*G.quietModules+n);
+  var quietMm = G.quietModules*moduleSize;
+  var qrSide = n*moduleSize;
+  var ox = x + (w-S)/2 + quietMm;
+  var oy = y + (h-S)/2 + quietMm;
+  var out = '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="#fff"/>';
+  var d='';
+  for(var r=0;r<n;r++){
+    for(var c=0;c<n;c++){
+      if(mx.matrix[r][c]){
+        d += 'M'+(ox+c*moduleSize)+' '+(oy+r*moduleSize)+'h'+moduleSize+'v'+moduleSize+'h'+(-moduleSize)+'z';
+      }
+    }
+  }
+  out += '<path d="'+d+'" fill="#000"/>';
+  return out;
+}
+
+function renderWindow(win, origin, side, forPrint){
+  var bb = windowBBoxLocal(win);
+  var c = toSvg(bb.cx, bb.cy, origin);
+  var x = c.x - bb.w/2, y = c.y - bb.h/2;
+  var transform = 'rotate('+(-win.rotation)+' '+c.x+' '+c.y+')';
+  var shapeEl;
+  if(forPrint){
+    // Printed output: window containers are invisible layout boxes by default — only
+    // an actual QR window's own white background/quiet-zone shows — unless this window's
+    // own "Print this window's border" checkbox is on.
+    var pStyle = 'fill:none;stroke:'+(win.printBorder?'#000':'none')+';stroke-width:0.25';
+    if(win.shape==='circle'){
+      shapeEl = '<circle cx="'+c.x+'" cy="'+c.y+'" r="'+(bb.w/2)+'" style="'+pStyle+'"/>';
+    } else {
+      shapeEl = '<rect x="'+x+'" y="'+y+'" width="'+bb.w+'" height="'+bb.h+'" style="'+pStyle+'"/>';
+    }
+  } else {
+    var selected = G.selected && G.selected.side===side && G.selected.id===win.id;
+    var cls = 'win-shape'+(selected?' selected':'')+(win.isQr?' qr-win':'')+(win.printBorder?' border-on':' border-off');
+    if(win.shape==='circle'){
+      shapeEl = '<circle class="'+cls+'" cx="'+c.x+'" cy="'+c.y+'" r="'+(bb.w/2)+'" data-id="'+win.id+'" data-side="'+side+'"/>';
+    } else {
+      shapeEl = '<rect class="'+cls+'" x="'+x+'" y="'+y+'" width="'+bb.w+'" height="'+bb.h+'" data-id="'+win.id+'" data-side="'+side+'"/>';
+    }
+  }
+  var contentEl = win.isQr ? renderQrContent(win,x,y,bb.w,bb.h,side) : renderTextImageContent(win,x,y,bb.w,bb.h);
+  var handle = '';
+  if(!forPrint){
+    var handleY = y-4;
+    // Resize handle sits at the shape's own bottom-right corner (right edge for a circle,
+    // since it only has one size — radius). It's drawn here, inside the same rotated <g>
+    // as everything else, so it visually tracks the shape through any rotation for free.
+    var rx = win.shape==='circle' ? (x+bb.w) : (x+bb.w);
+    var ry = win.shape==='circle' ? c.y : (y+bb.h);
+    handle = '<line class="rotate-handle-line" x1="'+c.x+'" y1="'+y+'" x2="'+c.x+'" y2="'+handleY+'"/>'+
+      '<circle class="rotate-handle" cx="'+c.x+'" cy="'+handleY+'" r="1.4" data-id="'+win.id+'" data-side="'+side+'"/>'+
+      '<rect class="resize-handle" x="'+(rx-1.6)+'" y="'+(ry-1.6)+'" width="3.2" height="3.2" data-id="'+win.id+'" data-side="'+side+'"/>';
+  }
+  return '<g class="win-group" data-id="'+win.id+'" data-side="'+side+'" transform="'+transform+'" style="pointer-events:auto">'+
+    shapeEl + '<g style="pointer-events:none">'+contentEl+'</g>' + handle + '</g>';
+}
+
+// True bounding box of the design itself, no cosmetic padding — used for print placement.
+function computeDesignBounds(origins){
+  var minX=0,minY=0,maxX=origins.front.ox+origins.front.w,maxY=origins.front.oy+origins.front.h;
+  Object.keys(origins).forEach(function(k){
+    var o=origins[k];
+    minX=Math.min(minX,o.ox); minY=Math.min(minY,o.oy);
+    maxX=Math.max(maxX,o.ox+o.w); maxY=Math.max(maxY,o.oy+o.h);
+  });
+  return {minX:minX, minY:minY, w:(maxX-minX), h:(maxY-minY)};
+}
+// Same, plus a little cosmetic padding — used only to frame the on-screen editor view.
+function computeStageBounds(origins){
+  var d = computeDesignBounds(origins);
+  return {minX:d.minX-6, minY:d.minY-6, w:d.w+12, h:d.h+12};
+}
+
+var PAPER_SIZES_MM = { A4:{w:210,h:297}, A5:{w:148,h:210}, A6:{w:105,h:148} };
+function paperSizeMm(paper, orientation){
+  var s = PAPER_SIZES_MM[paper] || PAPER_SIZES_MM.A5;
+  return orientation==='landscape' ? {w:s.h, h:s.w} : {w:s.w, h:s.h};
+}
+
+// renderStage() only touches the SVG preview — safe to call on every drag/keystroke.
+// structuralRender() also rebuilds the left-panel window cards — only call after
+// add/delete/mirror, never from a text-input handler, or the input loses focus mid-keystroke.
+function renderStage(){
+  var svg = document.getElementById('stage');
+  var origins = getPanelOrigins();
+  var bounds = computeStageBounds(origins);
+  svg.setAttribute('viewBox', bounds.minX+' '+bounds.minY+' '+bounds.w+' '+bounds.h);
+  var pxPerMm = 6;
+  svg.setAttribute('width', Math.round(bounds.w*pxPerMm));
+  svg.setAttribute('height', Math.round(bounds.h*pxPerMm));
+
+  var html = shapeOutlineSVG(G.front.shape, origins.front, 'front');
+  G.front.windows.forEach(function(w){ html += renderWindow(w, origins.front, 'front'); });
+
+  if(G.backEnabled){
+    html += shapeOutlineSVG(G.back.shape, origins.back, 'back');
+    G.back.windows.forEach(function(w){ html += renderWindow(w, origins.back, 'back'); });
+    html += foldLineSVG(origins, false); // always shown on-screen as an editing aid
+  }
+  svg.innerHTML = html;
+  window.__panelOrigins = origins;
+}
+
+// The exact midpoint line of the front/back gap ("fold allowance") — dashed, spans a
+// little past both tags' edges. forPrint=true gates it on G.print.showFoldLine; the
+// on-screen editor view always shows it regardless, purely as a layout aid.
+function foldLineSVG(origins, forPrint){
+  if(!G.backEnabled || !origins.back) return '';
+  if(forPrint && !G.print.showFoldLine) return '';
+  var f=origins.front, b=origins.back, dir=G.backDirection, overhang=2;
+  var x1,y1,x2,y2;
+  if(dir==='top' || dir==='bottom'){
+    var midY = dir==='top' ? (f.oy + (b.oy+b.h))/2 : ((f.oy+f.h) + b.oy)/2;
+    var minX = Math.min(f.ox,b.ox)-overhang, maxX = Math.max(f.ox+f.w,b.ox+b.w)+overhang;
+    x1=minX; x2=maxX; y1=midY; y2=midY;
+  } else {
+    var midX = dir==='left' ? (f.ox + (b.ox+b.w))/2 : ((f.ox+f.w) + b.ox)/2;
+    var minY = Math.min(f.oy,b.oy)-overhang, maxY = Math.max(f.oy+f.h,b.oy+b.h)+overhang;
+    y1=minY; y2=maxY; x1=midX; x2=midX;
+  }
+  var color = forPrint ? '#000' : '#f87171';
+  return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="0.25" stroke-dasharray="2,1.3"/>';
+}
+function render(){
+  renderStage();
+  updateQrCapacityReadouts();
+  updatePrintFitReadout();
+  updateMlPreview('front');
+  updateMlPreview('back');
+}
+function structuralRender(){
+  renderStage();
+  renderWindowLists();
+  updateQrCapacityReadouts();
+  updatePrintFitReadout();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PRINT — virtual paper (A6/A5/A4), margins, true 1:1 mm scale
+// ══════════════════════════════════════════════════════════════
+function printMetrics(){
+  var origins = getPanelOrigins();
+  var design = computeDesignBounds(origins);
+  var paper;
+  if(G.print.mode==='actual'){
+    // Real/actual size: a custom page sized exactly to the design plus margins — always fits by construction.
+    paper = { w: design.w+G.print.marginLeft+G.print.marginRight, h: design.h+G.print.marginTop+G.print.marginBottom };
+  } else {
+    paper = paperSizeMm(G.print.paper, G.print.orientation);
+  }
+  var printableW = paper.w - G.print.marginLeft - G.print.marginRight;
+  var printableH = paper.h - G.print.marginTop - G.print.marginBottom;
+  var fits = design.w<=printableW+0.01 && design.h<=printableH+0.01 && printableW>0 && printableH>0;
+  return {paper:paper, origins:origins, design:design, printableW:printableW, printableH:printableH, fits:fits};
+}
+
+function updatePrintFitReadout(){
+  var el = document.getElementById('printFitReadout');
+  if(!el) return;
+  var m = printMetrics();
+  el.className = 'qr-capacity'+(m.fits?'':' warn');
+  var pageDesc = G.print.mode==='actual' ? 'real / actual size, custom page' : (G.print.paper+' '+G.print.orientation);
+  el.innerHTML = 'Page: <b>'+m.paper.w.toFixed(1)+' × '+m.paper.h.toFixed(1)+' mm</b> ('+pageDesc+') &nbsp; '+
+    'Printable area: <b>'+m.printableW.toFixed(1)+' × '+m.printableH.toFixed(1)+' mm</b><br>'+
+    'Design size: <b>'+m.design.w.toFixed(1)+' × '+m.design.h.toFixed(1)+' mm</b> — '+
+    (m.fits ? '<b>fits within margins</b>' : '<b>too big for this page/margins</b> — pick a larger page, reduce margins, or shrink the fold gap');
+}
+
+// Where the design's top-left sits inside the printable page, in page mm — depends on
+// G.print.position. "Real / actual size" pages are always sized exactly to the design plus
+// margins, so there's only one valid placement there regardless of the position setting.
+function printOffset(m){
+  var pos = G.print.mode==='actual' ? 'topleft' : (G.print.position||'topleft');
+  if(pos==='bottomright'){
+    return { x: m.paper.w - G.print.marginRight - m.design.w, y: m.paper.h - G.print.marginBottom - m.design.h };
+  }
+  if(pos==='center'){
+    return {
+      x: m.printableW>=m.design.w ? G.print.marginLeft + (m.printableW-m.design.w)/2 : G.print.marginLeft,
+      y: m.printableH>=m.design.h ? G.print.marginTop + (m.printableH-m.design.h)/2 : G.print.marginTop
+    };
+  }
+  return { x: G.print.marginLeft, y: G.print.marginTop }; // topleft (default)
+}
+
+function buildPrintStage(){
+  var m = printMetrics();
+  var off = printOffset(m);
+  var tx = off.x - m.design.minX, ty = off.y - m.design.minY;
+
+  var html = shapeOutlinePrintSVG(G.front.shape, m.origins.front);
+  G.front.windows.forEach(function(w){ html += renderWindow(w, m.origins.front, 'front', true); });
+  if(G.backEnabled){
+    html += shapeOutlinePrintSVG(G.back.shape, m.origins.back);
+    G.back.windows.forEach(function(w){ html += renderWindow(w, m.origins.back, 'back', true); });
+    html += foldLineSVG(m.origins, true);
+  }
+
+  var svg = document.getElementById('printStage');
+  svg.setAttribute('viewBox', '0 0 '+m.paper.w+' '+m.paper.h);
+  svg.setAttribute('width', m.paper.w+'mm');
+  svg.setAttribute('height', m.paper.h+'mm');
+  svg.innerHTML = '<rect x="0" y="0" width="'+m.paper.w+'" height="'+m.paper.h+'" fill="#fff"/>'+
+    '<g transform="translate('+tx+' '+ty+')">'+html+'</g>';
+
+  var styleEl = document.getElementById('pageSizeStyle');
+  if(!styleEl){ styleEl=document.createElement('style'); styleEl.id='pageSizeStyle'; document.head.appendChild(styleEl); }
+  styleEl.textContent = '@page{ size: '+m.paper.w+'mm '+m.paper.h+'mm; margin:0; }';
+  return m.fits;
+}
+
+function doPrint(){
+  var fits = buildPrintStage();
+  if(!fits){
+    var proceed = confirm('The design is larger than the printable area for this paper size and margins, so it will overflow the page edge. Print anyway?');
+    if(!proceed) return;
+  }
+  window.print();
+}
+
+// A visual preview of the exact print output — same paper size, margins, fold line and
+// border settings as an actual print/export — shown in an on-screen overlay instead of
+// having to commit to the print dialog or a file download just to check the layout.
+function showPrintPreview(){
+  var fits = buildPrintStage();
+  var m = printMetrics();
+  var host = document.getElementById('printPreviewHost');
+  var liveSvg = document.getElementById('printStage');
+  host.innerHTML = liveSvg.outerHTML;
+  var previewSvg = host.querySelector('svg');
+  previewSvg.removeAttribute('width');
+  previewSvg.removeAttribute('height');
+  // width:100% + height:auto on an SVG with a viewBox scales it to fill its container
+  // while preserving the paper's true aspect ratio — the same technique as a responsive
+  // <img>. The host div's own max-width/max-height (below) is what keeps it on-screen.
+  previewSvg.style.width = '100%';
+  previewSvg.style.height = 'auto';
+  previewSvg.style.display = 'block';
+  previewSvg.style.background = '#fff';
+  previewSvg.style.boxShadow = '0 2px 12px rgba(0,0,0,.25)';
+  host.style.width = 'min(85vw, 700px)';
+
+  var pageDesc = G.print.mode==='actual' ? 'Real / actual size' : (G.print.paper+' '+capWord(G.print.orientation));
+  document.getElementById('printPreviewTitle').textContent =
+    'Print preview — '+pageDesc+', '+m.paper.w.toFixed(1)+' × '+m.paper.h.toFixed(1)+' mm'+(fits?'':'  ⚠ overflows this page');
+  var corr = (G.print.scaleCorrectionPct||100)/100;
+  var noteText;
+  if(!fits){
+    noteText = 'Design is bigger than the printable area — pick a larger page, shrink margins, or reduce the fold gap before printing.';
+  } else if(Math.abs(corr-1) < 1e-9){
+    noteText = 'This is exactly what Print / PDF / JPG / PNG will produce, to scale.';
+  } else {
+    noteText = 'This is the TRUE design size shown above, at correct scale — Print always matches it exactly. '+
+      'PDF/JPG/PNG downloads will come out '+(corr*100).toFixed(1)+'% larger than this (declared page '+
+      (m.paper.w*corr).toFixed(1)+' × '+(m.paper.h*corr).toFixed(1)+'mm for PDF, or that % more pixels for JPG/PNG), '+
+      'because of the scale correction set in step 7 — intended to cancel out a fixed shrink some printer apps apply on their own. Set it back to 100% if you don\'t need that.';
+  }
+  document.getElementById('printPreviewNote').textContent = noteText;
+  document.getElementById('printPreviewOverlay').style.display = 'flex';
+}
+// A large, clean render of one QR-flagged window's actual pattern, at a fixed on-screen
+// module size (not scaled to the window's tiny mm size on the tag) — for visually double-
+// checking a QR (contrast, quiet zone, obvious misreads) before committing to print.
+function showQrZoomPreview(side, id){
+  var win = findWindow(side, id);
+  if(!win || !win.isQr) return;
+  var content = buildQrContent(side);
+  var ec = resolveQrConfig(side).cfg.ec || 'M';
+  var host = document.getElementById('qrZoomHost');
+  var PX = 8; // on-screen px per QR module — fixed, independent of the window's real mm size
+  if(!content){
+    host.innerHTML = '<div style="padding:40px; color:#dc2626; font-family:sans-serif; font-size:14px; text-align:center; max-width:320px">No QR content configured yet for this side — see the QR Content section below.</div>';
+  } else {
+    var mx = getQrMatrix(content, ec);
+    if(!mx){
+      host.innerHTML = '<div style="padding:40px; color:#dc2626; font-family:sans-serif; font-size:14px;">QR library not loaded — cannot render a preview.</div>';
+    } else {
+      var n = mx.n, q = G.quietModules;
+      var side_px = (n + 2*q) * PX;
+      var d = '';
+      for(var r=0;r<n;r++){
+        for(var c=0;c<n;c++){
+          if(mx.matrix[r][c]) d += 'M'+((q+c)*PX)+' '+((q+r)*PX)+'h'+PX+'v'+PX+'h'+(-PX)+'z';
+        }
+      }
+      host.innerHTML = '<svg width="'+side_px+'" height="'+side_px+'" viewBox="0 0 '+side_px+' '+side_px+'" style="background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.25);">'+
+        '<rect x="0" y="0" width="'+side_px+'" height="'+side_px+'" fill="#fff"/>'+
+        '<path d="'+d+'" fill="#000"/></svg>';
+    }
+  }
+  document.getElementById('qrZoomTitle').textContent = '#'+win.id+' QR preview — '+(side==='front'?'Front':'Back')+', error correction '+ec;
+  var byteLen = content ? new Blob([content]).size : 0;
+  document.getElementById('qrZoomNote').innerHTML = content
+    ? 'Encodes ('+byteLen+' bytes): <code style="word-break:break-all; background:#f1f5f9; padding:2px 4px; border-radius:4px;">'+esc(content.length>300?content.slice(0,300)+'…':content)+'</code>'
+    : '';
+  document.getElementById('qrZoomOverlay').style.display = 'flex';
+}
+function closeQrZoomPreview(){
+  document.getElementById('qrZoomOverlay').style.display = 'none';
+}
+
+function closePrintPreview(){
+  document.getElementById('printPreviewOverlay').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SAVE / LOAD / HISTORY — this is a static, backend-less site, so "saved designs" live
+//  in this browser's own localStorage. They stay on this device/browser only — they
+//  won't follow you to a different computer or browser, and clearing site data removes
+//  them. Export a PDF/PNG of anything you want to keep permanently, same as before.
+// ══════════════════════════════════════════════════════════════
+var SAVED_DESIGNS_KEY = 'ltSavedDesigns_v1';
+
+function serializeState(){
+  var copy = JSON.parse(JSON.stringify(G));
+  delete copy.selected;
+  delete copy.dragging;
+  return copy;
+}
+function getSavedDesigns(){
+  try{ return JSON.parse(localStorage.getItem(SAVED_DESIGNS_KEY)||'[]'); }
+  catch(e){ return []; }
+}
+function setSavedDesigns(list){
+  try{ localStorage.setItem(SAVED_DESIGNS_KEY, JSON.stringify(list)); }
+  catch(e){ alert('Could not save — this browser\'s local storage may be full, disabled, or in a private/incognito window that clears on close.'); }
+}
+function saveDesign(){
+  var defaultName = (fieldVal(G.personal,'name')||'Tag') + ' — ' + new Date().toLocaleDateString();
+  var name = prompt('Name this saved design:', defaultName);
+  if(name===null) return; // cancelled
+  name = name.trim() || defaultName;
+  var list = getSavedDesigns();
+  list.unshift({ id: Date.now(), name: name, savedAt: new Date().toISOString(), state: serializeState() });
+  if(list.length > 50) list = list.slice(0, 50); // keep it from growing unbounded
+  setSavedDesigns(list);
+  renderSavedDesignsList();
+  showSavedDesignsModal();
+}
+function loadDesign(id){
+  var entry = getSavedDesigns().find(function(d){ return d.id===id; });
+  if(!entry) return;
+  if(!confirm('Load "'+entry.name+'"? This replaces everything currently on screen (save first if you want to keep it).')) return;
+  try{ localStorage.setItem('__ltPendingLoad', JSON.stringify(entry.state)); }
+  catch(e){ alert('Could not load — local storage may be full or disabled.'); return; }
+  location.reload();
+}
+function deleteDesign(id){
+  var entry = getSavedDesigns().find(function(d){ return d.id===id; });
+  if(!entry) return;
+  if(!confirm('Delete "'+entry.name+'"? This cannot be undone.')) return;
+  setSavedDesigns(getSavedDesigns().filter(function(d){ return d.id!==id; }));
+  renderSavedDesignsList();
+}
+function renderSavedDesignsList(){
+  var host = document.getElementById('savedDesignsList');
+  if(!host) return;
+  var list = getSavedDesigns();
+  var countEl = document.getElementById('savedDesignsCount');
+  if(countEl) countEl.textContent = list.length ? ' ('+list.length+')' : '';
+  if(!list.length){
+    host.innerHTML = '<div class="note">No saved designs yet — click "Save" to store what\'s currently on screen, right here in this browser.</div>';
+    return;
+  }
+  host.innerHTML = list.map(function(d){
+    var when = new Date(d.savedAt).toLocaleString();
+    return '<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border);">'+
+      '<div style="min-width:0"><div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">'+esc(d.name)+'</div>'+
+      '<div style="font-size:11px; color:var(--muted)">'+esc(when)+'</div></div>'+
+      '<div style="display:flex; gap:6px; flex:0 0 auto"><button class="btn small" onclick="loadDesign('+d.id+')">Load</button>'+
+      '<button class="btn small" onclick="deleteDesign('+d.id+')" style="color:var(--red)">Delete</button></div>'+
+    '</div>';
+  }).join('');
+}
+function showSavedDesignsModal(){
+  renderSavedDesignsList();
+  document.getElementById('savedDesignsOverlay').style.display = 'flex';
+}
+function closeSavedDesignsModal(){
+  document.getElementById('savedDesignsOverlay').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INTERACTION — drag / rotate / keyboard / cursor readout
+// ══════════════════════════════════════════════════════════════
+function svgPoint(evt){
+  var svg = document.getElementById('stage');
+  var pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  var ctm = svg.getScreenCTM();
+  if(!ctm) return {x:0,y:0};
+  var loc = pt.matrixTransform(ctm.inverse());
+  return {x:loc.x, y:loc.y};
+}
+
+document.addEventListener('mousemove', function(evt){
+  var svg = document.getElementById('stage');
+  var tip = document.getElementById('cursorTip');
+  if(!svg.getScreenCTM()){ tip.style.display='none'; return; }
+  var overStage = evt.target.closest && evt.target.closest('#stage');
+  var p = svgPoint(evt);
+  var origins = window.__panelOrigins || getPanelOrigins();
+  var readout = document.getElementById('cursorReadout');
+  var shown=false, tipText='';
+  ['front','back'].forEach(function(side){
+    var o = origins[side];
+    if(!o || shown) return;
+    if(pointInPanel(p.x,p.y,o)){
+      var l = fromSvg(p.x,p.y,o);
+      tipText = side+':  x '+l.x.toFixed(1)+' mm   y '+l.y.toFixed(1)+' mm';
+      readout.textContent = tipText;
+      shown=true;
+    }
+  });
+  if(!shown) readout.textContent = 'x: — mm   y: — mm';
+
+  // Floating tooltip right at the cursor tip — updates every mousemove while the pointer
+  // (or an active drag) is over the stage, so the mm reading is impossible to miss.
+  if(shown && (overStage || G.dragging)){
+    tip.textContent = tipText;
+    tip.style.left = (evt.clientX+16)+'px';
+    tip.style.top = (evt.clientY+16)+'px';
+    tip.style.display = 'block';
+  } else {
+    tip.style.display = 'none';
+  }
+
+  if(G.dragging){
+    var d=G.dragging;
+    var win = findWindow(d.side, d.id);
+    if(!win) return;
+    var o = origins[d.side];
+    if(d.mode==='move'){
+      var l = fromSvg(p.x, p.y, o);
+      win.x = round2(d.startWinX + (l.x - d.startLocal.x));
+      win.y = round2(d.startWinY + (l.y - d.startLocal.y));
+    } else if(d.mode==='rotate'){
+      var l2 = fromSvg(p.x, p.y, o);
+      var dx=l2.x-d.centerLocal.x, dy=l2.y-d.centerLocal.y;
+      var ang = Math.atan2(dy,dx)*180/Math.PI; // 0 = +x axis, 90 = up
+      win.rotation = round2(ang-90);
+    } else if(d.mode==='resize'){
+      // Corner-drag resize, anchored on the shape's own center regardless of whether it's
+      // stored as "bottom-left corner" or "center" — un-rotate the pointer's offset from
+      // center back into the shape's own unrotated frame so dragging still tracks the
+      // visual corner correctly at any rotation angle.
+      var l3 = fromSvg(p.x, p.y, o);
+      var ddx = l3.x - d.centerLocal.x, ddy = l3.y - d.centerLocal.y;
+      var MIN_SIZE = 3;
+      if(win.shape==='circle'){
+        var newR = Math.max(MIN_SIZE/2, Math.hypot(ddx,ddy));
+        win.r = round2(newR);
+        if(d.startPosMode==='bl'){ win.x = round2(d.centerLocal.x-newR); win.y = round2(d.centerLocal.y-newR); }
+      } else {
+        var t = win.rotation*Math.PI/180;
+        var ux = ddx*Math.cos(t) + ddy*Math.sin(t);
+        var uy = -ddx*Math.sin(t) + ddy*Math.cos(t);
+        var newW = Math.max(MIN_SIZE, 2*Math.abs(ux));
+        var newH = Math.max(MIN_SIZE, 2*Math.abs(uy));
+        win.w = round2(newW); win.h = round2(newH);
+        if(d.startPosMode==='bl'){ win.x = round2(d.centerLocal.x-newW/2); win.y = round2(d.centerLocal.y-newH/2); }
+      }
+    }
+    // Lightweight path: redraw the stage + capacity readouts only, and patch just
+    // this window's own X/Y/rotation inputs directly, so no input anywhere loses focus.
+    renderStage();
+    updateQrCapacityReadouts();
+    syncWindowCardInputs(d.side, d.id);
+  }
+});
+
+document.addEventListener('mousedown', function(evt){
+  var t = evt.target;
+  // Block Safari/WebKit's native "drag the SVG/text/image as a ghost" behaviour, which
+  // hijacks the gesture into drag/dragover events instead of mousemove — this is what was
+  // freezing the cursor mm-readout mid-drag. Any mousedown that lands inside the stage
+  // should stay ours, not the browser's, whether or not it hits a window shape.
+  if(t.closest && t.closest('#stage')) evt.preventDefault();
+  if(t.classList && t.classList.contains('rotate-handle')){
+    var id=parseInt(t.dataset.id,10), side=t.dataset.side;
+    var win=findWindow(side,id);
+    if(!win) return;
+    var bb=windowBBoxLocal(win);
+    G.selected={side:side,id:id};
+    G.dragging={side:side,id:id,mode:'rotate',centerLocal:{x:bb.cx,y:bb.cy}};
+    render();
+    evt.preventDefault();
+    return;
+  }
+  if(t.classList && t.classList.contains('resize-handle')){
+    var idR=parseInt(t.dataset.id,10), sideR=t.dataset.side;
+    var winR=findWindow(sideR,idR);
+    if(!winR) return;
+    var bbR=windowBBoxLocal(winR);
+    G.selected={side:sideR,id:idR};
+    G.dragging={side:sideR,id:idR,mode:'resize',centerLocal:{x:bbR.cx,y:bbR.cy},
+      startPosMode:winR.posMode, startW:winR.w, startH:winR.h, startR:winR.r};
+    render();
+    evt.preventDefault();
+    return;
+  }
+  if(t.classList && t.classList.contains('win-shape')){
+    var id2=parseInt(t.dataset.id,10), side2=t.dataset.side;
+    var win2=findWindow(side2,id2);
+    if(!win2) return;
+    var p0 = svgPoint(evt);
+    var origins = window.__panelOrigins || getPanelOrigins();
+    var l0 = fromSvg(p0.x,p0.y,origins[side2]);
+    G.selected={side:side2,id:id2};
+    G.dragging={side:side2,id:id2,mode:'move',startWinX:win2.x,startWinY:win2.y,startLocal:l0};
+    render();
+    evt.preventDefault();
+    return;
+  }
+});
+
+document.addEventListener('mouseup', function(){
+  if(G.dragging){ G.dragging=null; render(); }
+});
+
+document.addEventListener('keydown', function(evt){
+  var tag=(evt.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea'||tag==='select') return;
+  if(!G.selected) return;
+  var win=findWindow(G.selected.side, G.selected.id);
+  if(!win) return;
+  if(evt.key==='Delete'||evt.key==='Backspace'){
+    evt.preventDefault();
+    deleteWindow(G.selected.side, G.selected.id);
+    return;
+  }
+  var step = evt.shiftKey ? 0.1 : 1;
+  var used=true;
+  if(evt.key==='ArrowLeft') win.x=round2(win.x-step);
+  else if(evt.key==='ArrowRight') win.x=round2(win.x+step);
+  else if(evt.key==='ArrowUp') win.y=round2(win.y+step);
+  else if(evt.key==='ArrowDown') win.y=round2(win.y-step);
+  else used=false;
+  if(used){
+    evt.preventDefault();
+    renderStage();
+    updateQrCapacityReadouts();
+    syncWindowCardInputs(G.selected.side, G.selected.id);
+  }
+});
+
+function round2(n){ return Math.round(n*100)/100; }
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════
+//  WINDOW CARDS (front / back control-panel cards for each window)
+// ══════════════════════════════════════════════════════════════
+function windowCardHTML(win, side){
+  var isCircle = win.shape==='circle';
+  var shapeLabel = isCircle?'Circle':(win.shape==='square'?'Square':'Rectangle');
+  var html = '<div class="win-card" data-winid="'+win.id+'">';
+  html += '<div class="win-head"><b>#'+win.id+' '+shapeLabel+'</b><span class="tag'+(win.isQr?' qr':'')+'">'+(win.isQr?'QR window':'text / image')+'</span>'+
+    '<span style="flex:1"></span><button class="btn small danger" data-action="delete-window" type="button">Delete</button></div>';
+
+  html += '<label>Position mode</label><div class="pill-group" data-group="posMode">'+
+    '<div class="pill'+(win.posMode==='bl'?' on':'')+'" data-val="bl">Bottom-left corner</div>'+
+    '<div class="pill'+(win.posMode==='center'?' on':'')+'" data-val="center">Center</div></div>';
+
+  html += '<div class="row3">'+
+    '<div><label>X (mm)</label><input type="number" step="0.5" data-field="x" value="'+win.x+'"></div>'+
+    '<div><label>Y (mm)</label><input type="number" step="0.5" data-field="y" value="'+win.y+'"></div>'+
+    '<div><label>Rotation (deg)</label><input type="number" step="1" data-field="rotation" value="'+win.rotation+'"></div>'+
+    '</div>';
+
+  if(isCircle){
+    html += '<label>Radius (mm)</label><input type="number" step="0.5" data-field="r" value="'+win.r+'">';
+  } else {
+    html += '<div class="row">'+
+      '<div><label>Width (mm)</label><input type="number" step="0.5" data-field="w" value="'+win.w+'"></div>'+
+      '<div><label>Height (mm)</label><input type="number" step="0.5" data-field="h" value="'+win.h+'"></div>'+
+      '</div>';
+  }
+  html += '<div class="chk"><input type="checkbox" data-field="printBorder" '+(win.printBorder?'checked':'')+'> Print this window\'s border</div>';
+
+  html += '<hr class="sep"><div class="chk"><input type="checkbox" data-field="isQr" '+(win.isQr?'checked':'')+'> Use this window as a QR code</div>';
+
+  if(win.isQr){
+    html += '<div class="qr-capacity" id="cap_'+side+'_'+win.id+'">calculating…</div>';
+    html += '<button class="btn small" data-action="qr-zoom-preview" type="button" style="margin-top:6px">🔍 Preview this QR (full size)</button>';
+    html += '<div class="note">This window\'s QR content comes from the "'+(side==='front'?'Front QR Content':'Back Tag')+'" section below — flag as many windows as you like, they all encode the same configured content.</div>';
+  } else {
+    html += '<label>Image</label><input type="file" accept="image/*" data-field="image">';
+    if(win.image) html += '<button class="btn small" data-action="remove-image" type="button" style="margin-top:6px">Remove image</button>';
+    html += '<label>Text</label><textarea data-field="text" rows="2">'+esc(win.text)+'</textarea>';
+    html += '<label>Text position relative to image</label><div class="pill-group" data-group="textPos">'+
+      ['top','bottom','left','right','over'].map(function(v){ return '<div class="pill'+(win.textPos===v?' on':'')+'" data-val="'+v+'">'+v+'</div>'; }).join('')+
+      '</div>';
+    html += '<div class="row4">'+
+      '<div><label>Font</label><select data-field="fontFamily">'+
+      ['system','arial','georgia','courier','times'].map(function(f){ return '<option value="'+f+'"'+(win.font.family===f?' selected':'')+'>'+f+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div><label>Size (mm)</label><input type="number" step="0.2" data-field="fontSize" value="'+win.font.size+'"></div>'+
+      '<div><label>Weight</label><select data-field="fontWeight"><option value="normal"'+(win.font.weight==='normal'?' selected':'')+'>normal</option><option value="bold"'+(win.font.weight==='bold'?' selected':'')+'>bold</option></select></div>'+
+      '<div><label>Style</label><select data-field="fontStyle"><option value="normal"'+(win.font.style==='normal'?' selected':'')+'>normal</option><option value="italic"'+(win.font.style==='italic'?' selected':'')+'>italic</option></select></div>'+
+      '</div>';
+    html += '<div class="row">'+
+      '<div><label>Color</label><input type="color" data-field="fontColor" value="'+win.font.color+'"></div>'+
+      '<div><label>Align</label><select data-field="fontAlign"><option value="left"'+(win.font.align==='left'?' selected':'')+'>left</option><option value="center"'+(win.font.align==='center'?' selected':'')+'>center</option><option value="right"'+(win.font.align==='right'?' selected':'')+'>right</option></select></div>'+
+      '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderWindowLists(){
+  var f = document.getElementById('frontWindowList');
+  f.innerHTML = G.front.windows.map(function(w){ return windowCardHTML(w,'front'); }).join('') || '<div class="note">No windows yet — add one above.</div>';
+  var b = document.getElementById('backWindowList');
+  if(b) b.innerHTML = G.back.windows.map(function(w){ return windowCardHTML(w,'back'); }).join('') || '<div class="note">No windows yet — add one above.</div>';
+}
+
+function syncWindowCardInputs(side,id){
+  var win = findWindow(side,id);
+  if(!win) return;
+  var card = document.querySelector('.win-card[data-winid="'+id+'"]');
+  if(!card) return;
+  var xEl=card.querySelector('[data-field="x"]'), yEl=card.querySelector('[data-field="y"]'), rotEl=card.querySelector('[data-field="rotation"]');
+  var wEl=card.querySelector('[data-field="w"]'), hEl=card.querySelector('[data-field="h"]'), rEl=card.querySelector('[data-field="r"]');
+  if(xEl && document.activeElement!==xEl) xEl.value = win.x;
+  if(yEl && document.activeElement!==yEl) yEl.value = win.y;
+  if(rotEl && document.activeElement!==rotEl) rotEl.value = win.rotation;
+  if(wEl && document.activeElement!==wEl) wEl.value = win.w;
+  if(hEl && document.activeElement!==hEl) hEl.value = win.h;
+  if(rEl && document.activeElement!==rEl) rEl.value = win.r;
+}
+
+function updateQrCapacityReadouts(){
+  ['front','back'].forEach(function(side){
+    G[side].windows.forEach(function(win){
+      if(!win.isQr) return;
+      var el = document.getElementById('cap_'+side+'_'+win.id);
+      if(!el) return;
+      var bb = windowBBoxLocal(win);
+      var S = Math.min(bb.w, bb.h);
+      var levels = capacityAllLevels(S, G.minModule, G.quietModules);
+      var content = buildQrContent(side);
+      var ec = resolveQrConfig(side).cfg.ec || 'M';
+      var len = content ? new Blob([content]).size : 0;
+      var chosen = levels[ec];
+      var fits = !!content && chosen.capacity>=len && chosen.maxModules>0;
+      var lines = ['L','M','Q','H'].map(function(k){ return k+': '+levels[k].capacity+' chars (v'+levels[k].version+')'; }).join(' &nbsp; ');
+      el.className = 'qr-capacity'+(fits?'':' warn');
+      el.innerHTML = 'Usable side at '+G.minModule+'mm/module: <b>'+S.toFixed(1)+' mm</b><br>'+lines+'<br>'+
+        (content ? 'Current content: <b>'+len+' bytes</b> at '+ec+' correction — '+(fits?'<b>fits comfortably</b>':'<b>too big — raise EC/window size or shorten content</b>')
+                 : '<span style="color:var(--red)">No content configured yet for this side\'s QR (see step 4/5 below).</span>');
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WINDOW CRUD
+// ══════════════════════════════════════════════════════════════
+function addWindow(side, shape){
+  var origin = (window.__panelOrigins||getPanelOrigins())[side];
+  var w = {
+    id:G.nextId++, shape:shape, posMode:'bl', rotation:0, isQr:false, printBorder:false,
+    image:null, text:'Sample text', textPos:'bottom',
+    font:{family:'system', size:4, weight:'normal', style:'normal', color:'#111111', align:'center'}
+  };
+  if(shape==='circle'){ w.r=10; w.x=round2((origin?origin.w/2:20)-10); w.y=round2((origin?origin.h/2:20)-10); }
+  else { w.w = shape==='square'?20:30; w.h=20; w.x=10; w.y=10; }
+  G[side].windows.push(w);
+  G.selected={side:side,id:w.id};
+  structuralRender();
+}
+function deleteWindow(side,id){
+  G[side].windows = G[side].windows.filter(function(w){ return w.id!==id; });
+  if(G.selected && G.selected.side===side && G.selected.id===id) G.selected=null;
+  structuralRender();
+}
+function findWindow(side, id){
+  var arr = G[side] && G[side].windows;
+  if(!arr) return null;
+  for(var i=0;i<arr.length;i++) if(arr[i].id===id) return arr[i];
+  return null;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DELEGATED EVENTS FOR WINDOW CARDS
+// ══════════════════════════════════════════════════════════════
+function handleWindowFieldChange(evt, side){
+  var el = evt.target;
+  var field = el.dataset.field;
+  if(!field) return;
+  var cardEl = el.closest('[data-winid]');
+  if(!cardEl) return;
+  var id = parseInt(cardEl.dataset.winid,10);
+  var win = findWindow(side, id);
+  if(!win) return;
+
+  if(field==='image'){
+    var file = el.files && el.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){ win.image = e.target.result; render(); };
+    reader.readAsDataURL(file);
+    return;
+  }
+  if(field==='fontFamily'){ win.font.family=el.value; render(); return; }
+  if(field==='fontSize'){ win.font.size=parseFloat(el.value)||4; render(); return; }
+  if(field==='fontWeight'){ win.font.weight=el.value; render(); return; }
+  if(field==='fontStyle'){ win.font.style=el.value; render(); return; }
+  if(field==='fontColor'){ win.font.color=el.value; render(); return; }
+  if(field==='fontAlign'){ win.font.align=el.value; render(); return; }
+  if(field==='isQr'){ win.isQr = el.checked; structuralRender(); return; }
+
+  var v = el.type==='checkbox' ? el.checked : el.value;
+  if(['x','y','w','h','r','rotation'].indexOf(field)>=0) v = parseFloat(v)||0;
+  win[field] = v;
+  render();
+}
+
+function handleWindowClick(evt, side){
+  var pill = evt.target.closest('.pill');
+  if(pill){
+    var cardEl = evt.target.closest('[data-winid]');
+    var id = parseInt(cardEl.dataset.winid,10);
+    var win = findWindow(side,id);
+    if(!win) return;
+    var group = pill.closest('.pill-group').dataset.group;
+    if(group==='posMode') win.posMode = pill.dataset.val;
+    if(group==='textPos') win.textPos = pill.dataset.val;
+    pill.closest('.pill-group').querySelectorAll('.pill').forEach(function(p){ p.classList.toggle('on', p===pill); });
+    render();
+    return;
+  }
+  var delBtn = evt.target.closest('[data-action="delete-window"]');
+  if(delBtn){
+    var cardEl2 = evt.target.closest('[data-winid]');
+    deleteWindow(side, parseInt(cardEl2.dataset.winid,10));
+    return;
+  }
+  var rmImg = evt.target.closest('[data-action="remove-image"]');
+  if(rmImg){
+    var cardEl3 = evt.target.closest('[data-winid]');
+    var win3 = findWindow(side, parseInt(cardEl3.dataset.winid,10));
+    if(win3){ win3.image=null; structuralRender(); }
+  }
+  var qrZoomBtn = evt.target.closest('[data-action="qr-zoom-preview"]');
+  if(qrZoomBtn){
+    var cardEl4 = evt.target.closest('[data-winid]');
+    showQrZoomPreview(side, parseInt(cardEl4.dataset.winid,10));
+  }
+}
+
+function bindWindowListEvents(side){
+  var container = document.getElementById(side==='front'?'frontWindowList':'backWindowList');
+  container.addEventListener('input', function(evt){ handleWindowFieldChange(evt, side); });
+  container.addEventListener('change', function(evt){ handleWindowFieldChange(evt, side); });
+  container.addEventListener('click', function(evt){ handleWindowClick(evt, side); });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PERSONAL DETAILS UI
+// ══════════════════════════════════════════════════════════════
+function renderPersonalFieldsUI(containerId, obj){
+  var el = document.getElementById(containerId);
+  var html='';
+  PERSONAL_FIELD_DEFS.forEach(function(def){
+    var key=def[0], label=def[1], type=def[2];
+    html += '<div style="grid-column:1 / -1; margin-top:6px">';
+    html += '<label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'+
+      '<span>'+label+'</span>'+
+      '<span style="font-weight:600;font-size:10.5px;display:flex;align-items:center;gap:4px;color:var(--muted)">'+
+      '<input type="checkbox" data-pkey="'+key+'" data-role="show" '+(obj.show[key]?'checked':'')+' style="width:13px;height:13px;margin:0"> in QR</span></label>';
+    html += (type==='textarea')
+      ? '<textarea data-pkey="'+key+'" data-role="value" rows="2">'+esc(obj[key])+'</textarea>'
+      : '<input type="text" data-pkey="'+key+'" data-role="value" value="'+esc(obj[key])+'">';
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+function bindPersonalFieldEvents(containerId, obj){
+  var el = document.getElementById(containerId);
+  el.addEventListener('input', function(evt){
+    var t=evt.target;
+    if(t.dataset.role==='value'){ obj[t.dataset.pkey]=t.value; render(); }
+  });
+  el.addEventListener('change', function(evt){
+    var t=evt.target;
+    if(t.dataset.role==='show'){ obj.show[t.dataset.pkey]=t.checked; render(); }
+  });
+}
+function restoreSampleDetails(){
+  var sample = sampleFieldValues();
+  Object.keys(sample).forEach(function(k){ G.personal[k]=sample[k]; });
+  renderPersonalFieldsUI('personalFields', G.personal);
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SHAPE / QR-TYPE FIELD VISIBILITY
+// ══════════════════════════════════════════════════════════════
+function toggleShapeFields(side){
+  var type = G[side].shape.type;
+  var isRectLike = (type==='rect'||type==='square');
+  document.getElementById(side+'RectFields').style.display = isRectLike ? '' : 'none';
+  document.getElementById(side+'CircleFields').style.display = type==='circle' ? '' : 'none';
+  document.getElementById(side+'PolyFields').style.display = type==='polygon' ? '' : 'none';
+}
+function toggleQrTypeFields(side){
+  var type = G.qr[side].type;
+  ['shortlink','url','multilang','text','wifi','vcard'].forEach(function(t){
+    var el = document.getElementById(side+'Qr_'+t);
+    if(el) el.style.display = (t===type)?'':'none';
+  });
+  if(type==='multilang') updateMlPreview(side);
+}
+function parseVerts(text){
+  return text.split('\n').map(function(line){
+    var m = line.trim().match(/^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/);
+    return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+  }).filter(Boolean);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MISC ACTIONS
+// ══════════════════════════════════════════════════════════════
+function toggleCard(h2){ h2.parentElement.classList.toggle('collapsed'); }
+
+// "Mirror" copies only the tag's outer physical outline to the back — matching size and
+// shape, since that's what actually has to line up once it's folded and glued onto the
+// same piece of cardboard. It deliberately does NOT touch windows, QR flags, or data:
+// you decide what goes on the back yourself, the same way you built the front — add
+// windows with the buttons below, size/rotate them by dragging, then set their content.
+// A tag with a back is one continuous piece of material folded over a single crease — not
+// two separately-cut pieces — so the back's OUTLINE in the flat, pre-fold layout must be
+// the true mirror reflection of the front's outline across that shared crease, not an
+// identical copy. (For a plain rectangle/circle this is invisible since they're already
+// symmetric, but for any asymmetric cut — a chamfered corner, a notch — a blind copy puts
+// the cut on the wrong side once you actually fold it.) 'top'/'bottom' directions share a
+// horizontal crease, so this flips Y and keeps X, using the shape's own height; 'left'/
+// 'right' share a vertical crease, so it flips X and keeps Y. Rectangles/circles pass
+// through unchanged (reflecting a symmetric shape yields the identical shape); polygon
+// vertices are reflected point-by-point.
+function reflectShapeAcrossFold(shape, direction){
+  var bb = shapeBBox(shape);
+  var isHoriz = (direction==='top' || direction==='bottom');
+  var ns = JSON.parse(JSON.stringify(shape));
+  if(shape.type==='polygon'){
+    ns.vertices = (shape.vertices||[]).map(function(p){
+      return isHoriz ? [p[0], round2(bb.h-p[1])] : [round2(bb.w-p[0]), p[1]];
+    });
+  }
+  return ns;
+}
+
+function mirrorFrontLayoutToBack(){
+  G.back.shape = reflectShapeAcrossFold(G.front.shape, G.backDirection);
+  document.getElementById('backW').value = G.back.shape.w;
+  document.getElementById('backH').value = G.back.shape.h;
+  document.getElementById('backRx').value = G.back.shape.rx;
+  document.getElementById('backD').value = G.back.shape.d;
+  document.getElementById('backVerts').value = (G.back.shape.vertices||[]).map(function(p){ return p[0]+','+p[1]; }).join('\n');
+  document.querySelectorAll('.pill-group[data-group="backShapeType"] .pill').forEach(function(p){ p.classList.toggle('on', p.dataset.val===G.back.shape.type); });
+  toggleShapeFields('back');
+  structuralRender();
+}
+
+// Reflect one front window's position/rotation across the shared fold edge, into the back
+// panel's own local (bottom-left-origin, Y-up) coordinate frame. 'top'/'bottom' fold
+// directions share a horizontal edge, so the reflection flips Y and keeps X; 'left'/'right'
+// share a vertical edge, so it flips X and keeps Y — in both cases using each panel's OWN
+// bounding box, so a window's distance from the near (fold) edge is preserved on both sides
+// even if front/back end up different sizes. Rotation always negates for a single-axis
+// mirror (verified true regardless of which axis, not just the horizontal case).
+function mirrorWindowToBack(win, direction, fBBox, bBBox){
+  var bb = windowBBoxLocal(win);
+  var isHoriz = (direction==='top' || direction==='bottom');
+  var newCx, newCy;
+  if(isHoriz){ newCx = bb.cx; newCy = bBBox.h - bb.cy; }
+  else       { newCx = bBBox.w - bb.cx; newCy = bb.cy; }
+  var mw = JSON.parse(JSON.stringify(win));
+  mw.id = G.nextId++;
+  mw.posMode = 'bl';
+  mw.rotation = round2(-(win.rotation||0));
+  if(win.shape==='circle'){
+    mw.x = round2(newCx - win.r);
+    mw.y = round2(newCy - win.r);
+  } else {
+    mw.x = round2(newCx - bb.w/2);
+    mw.y = round2(newCy - bb.h/2);
+  }
+  return mw;
+}
+
+function mirrorFrontWindowsToBack(){
+  if(!G.backEnabled){ alert('Turn on "This design has a back" first — there\'s nowhere to put mirrored windows yet.'); return; }
+  if(!G.front.windows.length){ alert('The front has no windows yet — add some first, then mirror them to the back.'); return; }
+  var msg = G.back.windows.length
+    ? 'Replace all '+G.back.windows.length+' existing back window(s) with a mirror image of the front\'s '+G.front.windows.length+' window(s)? This can\'t be undone.'
+    : 'Add a mirror image of the front\'s '+G.front.windows.length+' window(s) to the back?';
+  if(!confirm(msg)) return;
+  var fBBox = shapeBBox(G.front.shape), bBBox = shapeBBox(G.back.shape);
+  G.back.windows = G.front.windows.map(function(w){ return mirrorWindowToBack(w, G.backDirection, fBBox, bBBox); });
+  G.selected = null;
+  structuralRender();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EXPORT — PDF / JPG / PNG, all sharing the same print-stage layout
+//  (virtual paper or real/actual size, whichever is selected in step 7)
+// ══════════════════════════════════════════════════════════════
+function sanitizeForFilename(s){
+  return String(s||'').trim().replace(/[^a-zA-Z0-9]+/g,'') || 'Tag';
+}
+function capWord(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function buildExportFilename(ext){
+  var name = sanitizeForFilename(G.personal.name);
+  var m = printMetrics();
+  var parts = [name];
+  if(G.print.mode==='virtual'){
+    parts.push('Virtual', G.print.paper, capWord(G.print.orientation));
+  } else {
+    var orient = m.paper.w>m.paper.h ? 'Landscape' : 'Portrait';
+    parts.push(Math.round(m.paper.w)+'x'+Math.round(m.paper.h)+'mm', orient);
+  }
+  return parts.join('_')+'.'+ext;
+}
+
+// Builds the print-stage SVG (respecting current paper mode/margins/border/fold-line
+// settings), rasterizes it to an off-screen canvas at high resolution, then hands the
+// canvas + fit-check + paper metrics to a callback. Shared by all three export formats
+// so PDF/JPG/PNG and the physical Print button always show exactly the same layout.
+function rasterizePrintStage(callback, scalePerMm){
+  var fits = buildPrintStage();
+  var m = printMetrics();
+  var svg = document.getElementById('printStage');
+  var xml = new XMLSerializer().serializeToString(svg);
+  var svg64 = btoa(unescape(encodeURIComponent(xml)));
+  var img = new Image();
+  img.onload = function(){
+    var scale = scalePerMm || 12; // ~300dpi-equivalent at typical tag sizes
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round(m.paper.w*scale);
+    canvas.height = Math.round(m.paper.h*scale);
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    callback(canvas, m, fits);
+  };
+  img.src = 'data:image/svg+xml;base64,'+svg64;
+}
+
+function confirmOverflow(fits){
+  if(fits) return true;
+  return confirm('This design overflows the selected page/margins, so it will be cut off at the edge. Save anyway?');
+}
+
+// Same compensation idea as the PDF's page-size inflation (see exportPDF), applied to a plain
+// raster export instead. A bitmap has no "declared physical size" field the way a PDF page
+// does, so the only lever available here is inflating its PIXEL dimensions by the same
+// percentage — this only helps if whatever app you open the PNG/JPG in does its own
+// fit-to-target scaling based on those pixel dimensions (some label-printer apps do; a plain
+// image viewer or a "print at actual size" flow won't need this and should leave it at 100%).
+// Returns the same canvas unchanged when the correction is 100% (the normal case).
+function applyScaleCorrection(canvas){
+  var corr = (G.print.scaleCorrectionPct||100)/100;
+  if(Math.abs(corr-1) < 1e-9) return canvas;
+  var out = document.createElement('canvas');
+  out.width = Math.round(canvas.width*corr);
+  out.height = Math.round(canvas.height*corr);
+  var ctx = out.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,out.width,out.height);
+  ctx.drawImage(canvas, 0, 0, out.width, out.height);
+  return out;
+}
+
+function exportPNG(){
+  rasterizePrintStage(function(canvas, m, fits){
+    if(!confirmOverflow(fits)) return;
+    var a=document.createElement('a');
+    a.download = buildExportFilename('png');
+    a.href = applyScaleCorrection(canvas).toDataURL('image/png');
+    a.click();
+  });
+}
+function exportJPG(){
+  rasterizePrintStage(function(canvas, m, fits){
+    if(!confirmOverflow(fits)) return;
+    var a=document.createElement('a');
+    a.download = buildExportFilename('jpg');
+    a.href = applyScaleCorrection(canvas).toDataURL('image/jpeg', 0.92);
+    a.click();
+  });
+}
+function exportPDF(){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('PDF library failed to load — check your internet connection and try again.');
+    return;
+  }
+  rasterizePrintStage(function(canvas, m, fits){
+    if(!confirmOverflow(fits)) return;
+    // Correction factor for apps that silently re-scale a PDF page on their way to a printer
+    // (some label-printer apps do this with no way to disable it). The rasterized content
+    // itself is untouched — still true 1:1 mm — only the PDF's OWN declared page size (and
+    // the image stretched to fill it) gets inflated by this factor, so that whatever external
+    // shrink gets applied lands back on the real intended size. 100% = no change, same as before.
+    var corr = (G.print.scaleCorrectionPct||100)/100;
+    var pw = m.paper.w*corr, ph = m.paper.h*corr;
+    var pdf = new window.jspdf.jsPDF({ unit:'mm', format:[pw, ph] });
+    var imgData = canvas.toDataURL('image/jpeg', 0.95);
+    pdf.addImage(imgData, 'JPEG', 0, 0, pw, ph);
+    pdf.save(buildExportFilename('pdf'));
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SHORT-URL SELF-REFERENCE GUARD — catches the single most confusing mistake this
+//  field invites: pasting the app's own URL (or its bare root, which serves index.html)
+//  instead of an actual info page. Scanning that QR would just reopen the designer.
+// ══════════════════════════════════════════════════════════════
+function checkShortLinkSelfReference(side){
+  var el = document.getElementById(side+'ShortLinkWarn');
+  if(!el) return;
+  var val = (G.qr[side].shortLink||'').trim();
+  if(!val){ el.textContent=''; return; }
+  var appUrl;
+  try{ appUrl = new URL(window.location.href); }catch(e){ el.textContent=''; return; }
+  var typed;
+  try{ typed = new URL(val); }catch(e){ el.textContent=''; return; } // not a full URL yet — nothing to warn about
+  var appDir = appUrl.pathname.replace(/[^\/]*$/, ''); // strip the filename, keep the folder
+  var typedDir = typed.pathname.replace(/[^\/]*$/, '');
+  var typedFile = typed.pathname.slice(typedDir.length);
+  var sameOrigin = typed.origin === appUrl.origin;
+  var sameFolder = typedDir === appDir;
+  var pointsAtApp = sameOrigin && sameFolder && (typedFile==='' || typedFile==='index.html');
+  el.innerHTML = pointsAtApp
+    ? '<span style="color:var(--red)">This points at the designer app itself (this page), not an info page — scanning it will just reopen this app. Did you mean viewer.html, a generated info page, or somewhere else entirely?</span>'
+    : '';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BAKED INFO PAGE — a standalone copy of viewer.html with this device's Personal
+//  Details embedded directly in the file (no ?d=... query string), so the Short URL
+//  QR content type can point at a short, fixed link and still land on a full data page.
+// ══════════════════════════════════════════════════════════════
+function exportBakedInfoPage(){
+  var statusEl = document.getElementById('bakedInfoStatus');
+  var dataStr = personalDataLines(G.personal).join('\n');
+  if(!dataStr){
+    statusEl.innerHTML = '<span style="color:var(--red)">Tick at least one Personal Details field "in QR" first (step 3) — there\'s nothing to put on the page yet.</span>';
+    return;
+  }
+  statusEl.textContent = 'Building…';
+  fetch('viewer.html').then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  }).then(function(html){
+    var tag = '<script>window.__BAKED_DATA = '+JSON.stringify(dataStr)+';<\/script>\n';
+    var marker = '<div id="content"></div>';
+    if(html.indexOf(marker)===-1) throw new Error('viewer.html template has changed — marker not found');
+    var out = html.replace(marker, marker+'\n'+tag);
+    var blob = new Blob([out], {type:'text/html'});
+    var url = URL.createObjectURL(blob);
+    var fname = 'info-'+sanitizeForFilename(G.personal.name).toLowerCase()+'.html';
+    var a = document.createElement('a');
+    a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    var guessedBase = window.location.href.replace(/[^\/]*$/, '');
+    statusEl.innerHTML = 'Downloaded <b>'+esc(fname)+'</b>. Upload that one file next to viewer.html on GitHub, '+
+      'then set the Short URL above to:<br><code style="user-select:text">'+esc(guessedBase+fname)+'</code>';
+  }).catch(function(e){
+    statusEl.innerHTML = '<span style="color:var(--red)">Couldn\'t build the info page ('+esc(e.message)+'). '+
+      'This needs the app loaded over http(s) (e.g. your GitHub Pages URL), not opened as a local file.</span>';
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  STATIC FIELD BINDINGS
+// ══════════════════════════════════════════════════════════════
+function initStaticBindings(){
+  document.getElementById('frontW').addEventListener('input', function(){ G.front.shape.w=parseFloat(this.value)||1; render(); });
+  document.getElementById('frontH').addEventListener('input', function(){ G.front.shape.h=parseFloat(this.value)||1; render(); });
+  document.getElementById('frontRx').addEventListener('input', function(){ G.front.shape.rx=parseFloat(this.value)||0; render(); });
+  document.getElementById('frontD').addEventListener('input', function(){ G.front.shape.d=parseFloat(this.value)||1; render(); });
+  document.getElementById('frontVerts').addEventListener('input', function(){ G.front.shape.vertices=parseVerts(this.value); render(); });
+  document.getElementById('frontShapePrintBorder').addEventListener('change', function(){ G.front.shape.printBorder=this.checked; updatePrintFitReadout(); });
+
+  document.getElementById('backW').addEventListener('input', function(){ G.back.shape.w=parseFloat(this.value)||1; render(); });
+  document.getElementById('backH').addEventListener('input', function(){ G.back.shape.h=parseFloat(this.value)||1; render(); });
+  document.getElementById('backRx').addEventListener('input', function(){ G.back.shape.rx=parseFloat(this.value)||0; render(); });
+  document.getElementById('backD').addEventListener('input', function(){ G.back.shape.d=parseFloat(this.value)||1; render(); });
+  document.getElementById('backVerts').addEventListener('input', function(){ G.back.shape.vertices=parseVerts(this.value); render(); });
+  document.getElementById('backShapePrintBorder').addEventListener('change', function(){ G.back.shape.printBorder=this.checked; updatePrintFitReadout(); });
+
+  document.getElementById('frontQrType').addEventListener('change', function(){ G.qr.front.type=this.value; toggleQrTypeFields('front'); render(); });
+  document.getElementById('frontShortLink').addEventListener('input', function(){ G.qr.front.shortLink=this.value; checkShortLinkSelfReference('front'); render(); });
+  document.getElementById('frontViewerBase').addEventListener('input', function(){ G.qr.front.viewerBase=this.value; render(); });
+  document.getElementById('frontPlainText').addEventListener('input', function(){ G.qr.front.text=this.value; render(); });
+  document.getElementById('frontWifiSSID').addEventListener('input', function(){ G.qr.front.wifiSSID=this.value; render(); });
+  document.getElementById('frontWifiPass').addEventListener('input', function(){ G.qr.front.wifiPass=this.value; render(); });
+  document.getElementById('frontWifiSec').addEventListener('change', function(){ G.qr.front.wifiSec=this.value; render(); });
+  document.getElementById('frontEc').addEventListener('change', function(){ G.qr.front.ec=this.value; render(); });
+
+  document.getElementById('backQrType').addEventListener('change', function(){ G.qr.back.type=this.value; toggleQrTypeFields('back'); render(); });
+  document.getElementById('backShortLink').addEventListener('input', function(){ G.qr.back.shortLink=this.value; checkShortLinkSelfReference('back'); render(); });
+  document.getElementById('backViewerBase').addEventListener('input', function(){ G.qr.back.viewerBase=this.value; render(); });
+  document.getElementById('backPlainText').addEventListener('input', function(){ G.qr.back.text=this.value; render(); });
+  document.getElementById('backWifiSSID').addEventListener('input', function(){ G.qr.back.wifiSSID=this.value; render(); });
+  document.getElementById('backWifiPass').addEventListener('input', function(){ G.qr.back.wifiPass=this.value; render(); });
+  document.getElementById('backWifiSec').addEventListener('change', function(){ G.qr.back.wifiSec=this.value; render(); });
+  document.getElementById('backEc').addEventListener('change', function(){ G.qr.back.ec=this.value; render(); });
+
+  document.getElementById('backEnabled').addEventListener('change', function(){
+    G.backEnabled=this.checked;
+    document.getElementById('backOptions').style.display=this.checked?'':'none';
+    render();
+  });
+  document.getElementById('backGap').addEventListener('input', function(){ G.backGap=parseFloat(this.value)||0; render(); });
+  document.getElementById('backSameDetails').addEventListener('change', function(){
+    G.backSameDetails=this.checked;
+    document.getElementById('backPersonalWrap').style.display=this.checked?'none':'';
+    render();
+  });
+  document.getElementById('backSameQr').addEventListener('change', function(){
+    G.backSameQr=this.checked;
+    document.getElementById('backQrWrap').style.display=this.checked?'none':'';
+    render();
+  });
+
+  document.getElementById('minModule').addEventListener('input', function(){ G.minModule=parseFloat(this.value)||0.35; render(); });
+  document.getElementById('quietModules').addEventListener('input', function(){ G.quietModules=parseInt(this.value,10)||4; render(); });
+
+  document.getElementById('marginTop').addEventListener('input', function(){ G.print.marginTop=parseFloat(this.value)||0; updatePrintFitReadout(); });
+  document.getElementById('marginBottom').addEventListener('input', function(){ G.print.marginBottom=parseFloat(this.value)||0; updatePrintFitReadout(); });
+  document.getElementById('marginLeft').addEventListener('input', function(){ G.print.marginLeft=parseFloat(this.value)||0; updatePrintFitReadout(); });
+  document.getElementById('marginRight').addEventListener('input', function(){ G.print.marginRight=parseFloat(this.value)||0; updatePrintFitReadout(); });
+  document.getElementById('showFoldLine').addEventListener('change', function(){ G.print.showFoldLine=this.checked; });
+  document.getElementById('printScaleCorrection').addEventListener('input', function(){ G.print.scaleCorrectionPct=parseFloat(this.value)||100; });
+
+  document.querySelectorAll('.pill-group').forEach(function(group){
+    if(group.closest('.win-card')) return;
+    group.addEventListener('click', function(evt){
+      var pill = evt.target.closest('.pill');
+      if(!pill) return;
+      var name = group.dataset.group;
+
+      // Language pickers (frontLang/backLang) are multi-select: each pill toggles
+      // independently instead of the usual single-select radio behaviour.
+      if(group.dataset.multi==='true'){
+        pill.classList.toggle('on');
+        var side = name==='frontLang' ? 'front' : 'back';
+        var code = pill.dataset.lang;
+        G.qr[side].langs[code] = pill.classList.contains('on');
+        updateMlPreview(side);
+        render();
+        return;
+      }
+
+      var val = pill.dataset.val;
+      group.querySelectorAll('.pill').forEach(function(p){ p.classList.toggle('on', p===pill); });
+      if(name==='frontShapeType'){ G.front.shape.type=val; toggleShapeFields('front'); render(); }
+      if(name==='backShapeType'){ G.back.shape.type=val; toggleShapeFields('back'); render(); }
+      if(name==='backDirection'){ G.backDirection=val; render(); }
+      if(name==='paperSize'){ G.print.paper=val; updatePrintFitReadout(); }
+      if(name==='paperOrientation'){ G.print.orientation=val; updatePrintFitReadout(); }
+      if(name==='printPosition'){ G.print.position=val; updatePrintFitReadout(); }
+      if(name==='paperMode'){
+        G.print.mode=val;
+        document.getElementById('virtualPaperFields').style.display = val==='virtual' ? '' : 'none';
+        updatePrintFitReadout();
+      }
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+function init(){
+  // A "Load" click stashes the saved state here and reloads the page, so init() can pick
+  // it up and reuse all of this function's existing field-sync logic below for free,
+  // instead of duplicating a second "apply state to UI" code path.
+  var isLoadedDesign = false;
+  try{
+    var pendingRaw = localStorage.getItem('__ltPendingLoad');
+    if(pendingRaw){
+      localStorage.removeItem('__ltPendingLoad');
+      var pending = JSON.parse(pendingRaw);
+      Object.keys(pending).forEach(function(k){ G[k]=pending[k]; });
+      var maxId = 0;
+      (G.front.windows||[]).concat(G.back.windows||[]).forEach(function(w){ if(w.id>maxId) maxId=w.id; });
+      G.nextId = Math.max(G.nextId||1, maxId+1);
+      isLoadedDesign = true;
+    }
+  }catch(e){ console.warn('Could not apply the loaded design:', e); }
+
+  document.getElementById('frontW').value=G.front.shape.w;
+  document.getElementById('frontH').value=G.front.shape.h;
+  document.getElementById('frontRx').value=G.front.shape.rx;
+  document.getElementById('frontD').value=G.front.shape.d;
+  document.getElementById('frontVerts').value=G.front.shape.vertices.map(function(p){return p[0]+','+p[1];}).join('\n');
+  document.getElementById('backW').value=G.back.shape.w;
+  document.getElementById('backH').value=G.back.shape.h;
+  document.getElementById('backRx').value=G.back.shape.rx;
+  document.getElementById('backD').value=G.back.shape.d;
+  document.getElementById('backVerts').value=G.back.shape.vertices.map(function(p){return p[0]+','+p[1];}).join('\n');
+
+  document.getElementById('frontQrType').value=G.qr.front.type;
+  document.getElementById('backQrType').value=G.qr.back.type;
+  document.getElementById('frontShortLink').value=G.qr.front.shortLink;
+  document.getElementById('frontEc').value=G.qr.front.ec;
+  document.getElementById('backShortLink').value=G.qr.back.shortLink;
+  document.getElementById('backEc').value=G.qr.back.ec;
+  checkShortLinkSelfReference('front');
+  checkShortLinkSelfReference('back');
+  document.getElementById('minModule').value=G.minModule;
+  document.getElementById('quietModules').value=G.quietModules;
+  document.getElementById('backSameQr').checked = G.backSameQr;
+  document.getElementById('backQrWrap').style.display = G.backSameQr ? 'none' : '';
+  document.getElementById('backSameDetails').checked = G.backSameDetails;
+  document.getElementById('backPersonalWrap').style.display = G.backSameDetails ? 'none' : '';
+  document.getElementById('backEnabled').checked = G.backEnabled;
+  document.getElementById('backOptions').style.display = G.backEnabled ? '' : 'none';
+
+  document.getElementById('marginTop').value=G.print.marginTop;
+  document.getElementById('marginBottom').value=G.print.marginBottom;
+  document.getElementById('marginLeft').value=G.print.marginLeft;
+  document.getElementById('marginRight').value=G.print.marginRight;
+  document.getElementById('printScaleCorrection').value=G.print.scaleCorrectionPct||100;
+  document.getElementById('frontShapePrintBorder').checked = G.front.shape.printBorder;
+  document.getElementById('backShapePrintBorder').checked = G.back.shape.printBorder;
+  document.getElementById('showFoldLine').checked = G.print.showFoldLine;
+
+  // Reflect G's actual current values here (not hardcoded 'rect'/'top') so a loaded
+  // saved design shows the right pill highlighted instead of always defaulting to these.
+  document.querySelector('.pill-group[data-group="frontShapeType"] .pill[data-val="'+G.front.shape.type+'"]').classList.add('on');
+  document.querySelector('.pill-group[data-group="backShapeType"] .pill[data-val="'+G.back.shape.type+'"]').classList.add('on');
+  document.querySelector('.pill-group[data-group="backDirection"] .pill[data-val="'+G.backDirection+'"]').classList.add('on');
+  document.querySelector('.pill-group[data-group="paperSize"] .pill[data-val="'+G.print.paper+'"]').classList.add('on');
+  document.querySelector('.pill-group[data-group="paperOrientation"] .pill[data-val="'+G.print.orientation+'"]').classList.add('on');
+  document.querySelector('.pill-group[data-group="printPosition"] .pill[data-val="'+(G.print.position||'topleft')+'"]').classList.add('on');
+  document.querySelector('.pill-group[data-group="paperMode"] .pill[data-val="'+G.print.mode+'"]').classList.add('on');
+  document.getElementById('virtualPaperFields').style.display = G.print.mode==='virtual' ? '' : 'none';
+
+  toggleShapeFields('front');
+  toggleShapeFields('back');
+  toggleQrTypeFields('front');
+  toggleQrTypeFields('back');
+
+  initStaticBindings();
+  renderPersonalFieldsUI('personalFields', G.personal);
+  bindPersonalFieldEvents('personalFields', G.personal);
+  renderPersonalFieldsUI('backPersonalFields', G.backPersonal);
+  bindPersonalFieldEvents('backPersonalFields', G.backPersonal);
+  bindWindowListEvents('front');
+  bindWindowListEvents('back');
+
+  // A loaded design already has its own real Personal Details and its own real windows —
+  // only seed the sample data + starter windows on a genuinely fresh/blank load.
+  if(!isLoadedDesign){
+    restoreSampleDetails();
+
+    // Seed a matched front/back starter layout instead of an empty canvas: a caption text
+    // window plus a QR window on the front, and the same two windows mirrored onto the back
+    // (reflected across the shared fold edge for the default backDirection:'bottom' — a window
+    // close to the fold on the front stays close to the fold on the back, just on that side's
+    // near edge instead, per the mirror rule) so both faces open pre-built and print-ready.
+    // Both windows also clear the new top-left/bottom-left chamfer on their respective panels.
+    addWindow('front','rect');
+    Object.assign(G.front.windows[0], {x:50, y:4, w:32, h:14, text:'Ankit Srivastava\nGlasgow, UK', textPos:'bottom',
+      font:{family:'system', size:4.5, weight:'bold', style:'normal', color:'#111111', align:'center'}});
+    addWindow('front','square');
+    Object.assign(G.front.windows[1], {isQr:true, posMode:'bl', x:23.5, y:18.5, w:25, h:25, rotation:0, printBorder:false});
+
+    addWindow('back','rect');
+    Object.assign(G.back.windows[0], {x:50, y:28, w:32, h:14, text:'Ankit Srivastava\nGlasgow, UK', textPos:'bottom',
+      font:{family:'system', size:4.5, weight:'bold', style:'normal', color:'#111111', align:'center'}});
+    addWindow('back','square');
+    Object.assign(G.back.windows[1], {isQr:true, posMode:'bl', x:23.5, y:2.5, w:25, h:25, rotation:0, printBorder:false});
+
+    G.selected = null;
+  }
+
+  renderSavedDesignsList();
+  structuralRender();
+}
+window.addEventListener('load', init);
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('./sw.js'); });
+}
+</script>
+</body>
+</html>
