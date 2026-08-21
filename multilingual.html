@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>Luggage contact — multilingual</title>
+  <meta name="app-version" content="v37">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#eef2f7;color:#172033;font:16px/1.45 system-ui,-apple-system,sans-serif}
+    .wrap{max-width:1120px;margin:auto;padding:22px}
+    .hero,.card{background:#fff;border-radius:18px;padding:20px;margin-bottom:14px;box-shadow:0 8px 28px #24324a18}
+    .hero{background:#101827;color:#fff}
+    .hero h1{margin:0 0 6px}
+    .muted{color:#667085}
+    .hero .muted{color:#b8c1d1}
+    .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .toolbar label{font-weight:800}
+    .toolbar select{font:inherit;padding:10px 12px;border:1px solid #ccd3df;border-radius:10px;background:#fff}
+    .lang-buttons{display:flex;gap:8px;flex-wrap:wrap}
+    .lang-btn{font:inherit;font-weight:700;padding:10px 16px;border:2px solid #1677ff;border-radius:11px;background:#fff;color:#1677ff;cursor:pointer}
+    .lang-btn.on{background:#1677ff;color:#fff}
+    .scroll-hint{font-weight:800;color:#087f5b;margin-top:4px}
+    .columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .column-title{margin:0 0 12px;font-size:20px}
+    .row{padding:12px 0;border-top:1px solid #e6e9ef}
+    .row:first-of-type{border:0}
+    .label{font-size:12px;font-weight:800;text-transform:uppercase;color:#667085}
+    .value{white-space:pre-line;font-weight:600;margin-top:3px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .btn{display:inline-block;text-decoration:none;background:#1677ff;color:#fff;border:0;border-radius:9px;padding:8px 11px;font-weight:700;cursor:pointer}
+    .green{background:#138a55}
+    .note{background:#fff8dc;border-left:5px solid #f5b700}
+    .copy{width:100%;border:0;background:#5b4fd1;color:#fff;padding:13px;border-radius:11px;font-weight:800;font-size:16px;cursor:pointer}
+    .copy.secondary{background:#087f5b;margin-top:10px}
+    .copy.dark{background:#101827;margin-top:10px}
+    .empty{text-align:center;padding:60px 30px;color:#475569}
+    .empty .e-icon{font-size:56px;margin-bottom:16px}
+    @media(max-width:760px){.columns{grid-template-columns:1fr}.wrap{padding:12px}}
+  </style>
+</head>
+<body><main class="wrap">
+  <section class="hero"><h1 id="heroName">Luggage Tag</h1><div class="muted">Multilingual travel contact information</div></section>
+  <section class="card" id="toolbar" style="display:none">
+    <div class="lang-buttons" id="langButtons"></div>
+    <div class="scroll-hint" id="scrollHint" style="display:none"></div>
+    <div class="muted" style="margin-top:8px">Contact details stay in their original form for accuracy; only labels and the recovery message are translated.</div>
+  </section>
+  <div class="columns" id="columns" style="display:none">
+    <section class="card" id="original"></section>
+    <section class="card" id="translated"></section>
+  </div>
+  <div id="actionButtons" style="display:none">
+    <button class="copy" onclick="copyOriginal()">Copy original information</button>
+    <button class="copy secondary" onclick="copyTranslated()">Copy translated information</button>
+    <button class="copy dark" onclick="saveContact()">💾 Save as Contact</button>
+  </div>
+  <div id="emptyState"></div>
+</main>
+<script>
+// ══════════════════════════════════════════════════════════════
+// Base field labels + recovery message per language. Contact VALUES
+// (names, numbers, addresses, free-text notes) are never machine-translated —
+// only these chrome labels and the fixed recovery message are.
+// ══════════════════════════════════════════════════════════════
+var LANGS = {
+  en:{title:'English / Original', name:'Name', org:'Organisation', address:'Address', mobile:'Mobile', phone:'Telephone', whatsapp:'WhatsApp', email:'Email', notes:'Notes',
+    message:'If you found this bag, please contact the owner using the details on this page. Thank you!',
+    call:'Call', openWhatsApp:'Open WhatsApp', emailAction:'Email', apple:'Apple Maps', google:'Google Maps',
+    selectLanguage:'Select Language', scrollDown:'Scroll down for the translation ↓'},
+  es:{title:'Español', name:'Nombre', org:'Organización', address:'Dirección', mobile:'Móvil', phone:'Teléfono', whatsapp:'WhatsApp', email:'Correo electrónico', notes:'Nota',
+    message:'Si ha encontrado este equipaje, por favor contacte al propietario usando los datos de esta página. ¡Gracias!',
+    call:'Llamar', openWhatsApp:'Abrir WhatsApp', emailAction:'Correo', apple:'Apple Maps', google:'Google Maps',
+    selectLanguage:'Seleccionar idioma', scrollDown:'Desplázate hacia abajo para ver la traducción ↓'},
+  fr:{title:'Français', name:'Nom', org:'Organisation', address:'Adresse', mobile:'Portable', phone:'Téléphone', whatsapp:'WhatsApp', email:'E-mail', notes:'Remarque',
+    message:'Si vous avez trouvé ce bagage, merci de contacter le propriétaire grâce aux coordonnées de cette page. Merci !',
+    call:'Appeler', openWhatsApp:'Ouvrir WhatsApp', emailAction:'E-mail', apple:'Apple Plans', google:'Google Maps',
+    selectLanguage:'Choisir la langue', scrollDown:'Faites défiler vers le bas pour la traduction ↓'},
+  de:{title:'Deutsch', name:'Name', org:'Organisation', address:'Adresse', mobile:'Mobiltelefon', phone:'Telefon', whatsapp:'WhatsApp', email:'E-Mail', notes:'Hinweis',
+    message:'Wenn Sie dieses Gepäck gefunden haben, kontaktieren Sie bitte den Eigentümer über die Angaben auf dieser Seite. Danke!',
+    call:'Anrufen', openWhatsApp:'WhatsApp öffnen', emailAction:'E-Mail', apple:'Apple Karten', google:'Google Maps',
+    selectLanguage:'Sprache auswählen', scrollDown:'Nach unten scrollen für die Übersetzung ↓'},
+  it:{title:'Italiano', name:'Nome', org:'Organizzazione', address:'Indirizzo', mobile:'Cellulare', phone:'Telefono', whatsapp:'WhatsApp', email:'E-mail', notes:'Nota',
+    message:'Se hai trovato questo bagaglio, contatta il proprietario usando i dati di questa pagina. Grazie!',
+    call:'Chiama', openWhatsApp:'Apri WhatsApp', emailAction:'E-mail', apple:'Mappe Apple', google:'Google Maps',
+    selectLanguage:'Seleziona lingua', scrollDown:'Scorri verso il basso per la traduzione ↓'},
+  pt:{title:'Português', name:'Nome', org:'Organização', address:'Endereço', mobile:'Telemóvel', phone:'Telefone', whatsapp:'WhatsApp', email:'E-mail', notes:'Nota',
+    message:'Se encontrou esta bagagem, contacte o proprietário usando os dados desta página. Obrigado!',
+    call:'Ligar', openWhatsApp:'Abrir WhatsApp', emailAction:'E-mail', apple:'Mapas Apple', google:'Google Maps',
+    selectLanguage:'Selecionar idioma', scrollDown:'Deslize para baixo para a tradução ↓'},
+  hi:{title:'हिन्दी', name:'नाम', org:'संगठन', address:'पता', mobile:'मोबाइल', phone:'टेलीफ़ोन', whatsapp:'व्हाट्सऐप', email:'ईमेल', notes:'नोट',
+    message:'यदि आपको यह सामान मिला है, तो कृपया इस पृष्ठ पर दिए विवरण से मालिक से संपर्क करें। धन्यवाद!',
+    call:'कॉल करें', openWhatsApp:'व्हाट्सऐप खोलें', emailAction:'ईमेल', apple:'Apple Maps', google:'Google Maps',
+    selectLanguage:'भाषा चुनें', scrollDown:'अनुवाद देखने के लिए नीचे स्क्रॉल करें ↓'},
+  pa:{title:'ਪੰਜਾਬੀ', name:'ਨਾਮ', org:'ਸੰਗਠਨ', address:'ਪਤਾ', mobile:'ਮੋਬਾਈਲ', phone:'ਟੈਲੀਫ਼ੋਨ', whatsapp:'WhatsApp', email:'ਈਮੇਲ', notes:'ਨੋਟ',
+    message:'ਜੇ ਤੁਹਾਨੂੰ ਇਹ ਸਮਾਨ ਮਿਲਿਆ ਹੈ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਪੰਨੇ \'ਤੇ ਦਿੱਤੇ ਵੇਰਵਿਆਂ ਰਾਹੀਂ ਮਾਲਕ ਨਾਲ ਸੰਪਰਕ ਕਰੋ। ਧੰਨਵਾਦ!',
+    call:'ਕਾਲ ਕਰੋ', openWhatsApp:'WhatsApp ਖੋਲ੍ਹੋ', emailAction:'ਈਮੇਲ', apple:'Apple Maps', google:'Google Maps',
+    selectLanguage:'ਭਾਸ਼ਾ ਚੁਣੋ', scrollDown:'ਅਨੁਵਾਦ ਲਈ ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ ↓'},
+  ar:{title:'العربية', name:'الاسم', org:'المؤسسة', address:'العنوان', mobile:'الهاتف المحمول', phone:'الهاتف', whatsapp:'واتساب', email:'البريد الإلكتروني', notes:'ملاحظة',
+    message:'إذا عثرت على هذه الأمتعة، يرجى التواصل مع المالك باستخدام البيانات الموجودة في هذه الصفحة. شكرًا لك!',
+    call:'اتصال', openWhatsApp:'فتح واتساب', emailAction:'البريد الإلكتروني', apple:'خرائط Apple', google:'خرائط Google',
+    selectLanguage:'اختر اللغة', scrollDown:'مرر للأسفل لرؤية الترجمة ↓'},
+  zh:{title:'简体中文', name:'姓名', org:'机构', address:'地址', mobile:'手机', phone:'电话', whatsapp:'WhatsApp', email:'电子邮箱', notes:'备注',
+    message:'如您找到这件行李，请通过本页信息联系失主。谢谢！',
+    call:'拨打电话', openWhatsApp:'打开 WhatsApp', emailAction:'电子邮件', apple:'Apple 地图', google:'Google 地图',
+    selectLanguage:'选择语言', scrollDown:'向下滚动查看翻译 ↓'},
+  ja:{title:'日本語', name:'氏名', org:'組織', address:'住所', mobile:'携帯電話', phone:'電話', whatsapp:'WhatsApp', email:'メール', notes:'メモ',
+    message:'この荷物を見つけた場合は、このページの情報を使って持ち主にご連絡ください。ありがとうございます！',
+    call:'電話する', openWhatsApp:'WhatsApp を開く', emailAction:'メール', apple:'Apple マップ', google:'Google マップ',
+    selectLanguage:'言語を選択', scrollDown:'翻訳を見るには下にスクロール ↓'}
+};
+var LANG_CODES = {s:'es',f:'fr',d:'de',i:'it',p:'pt',h:'hi',u:'pa',a:'ar',c:'zh',j:'ja'};
+
+// ══════════════════════════════════════════════════════════════
+// Parse ?d= (same "key: value" per line format viewer.html uses) and ?l=
+// ══════════════════════════════════════════════════════════════
+function getParam(name){ return new URLSearchParams(location.search).get(name); }
+
+function parseData(raw){
+  var data = {};
+  if(!raw) return data;
+  raw.split(/[\n|]+/).forEach(function(line){
+    line = line.trim();
+    if(!line) return;
+    var m = line.match(/^([^:]+):\s*(.+)$/);
+    if(m) data[m[1].trim().toLowerCase()] = m[2].trim();
+  });
+  return data;
+}
+
+var data = parseData(getParam('d'));
+var requestedCodes = (getParam('l')||'').split('').map(function(c){ return LANG_CODES[c]; }).filter(Boolean);
+
+// FIELD_ORDER: [dataKey, labelKeyInLANGS, suffix('' or ' 1'/' 2'), actionType]
+var FIELD_ORDER = [
+  ['name','name','',null],
+  ['org','org','',null],
+  ['address','address',' 1','map'],
+  ['address2','address',' 2','map'],
+  ['mobile','mobile',' 1','tel'],
+  ['mobile2','mobile',' 2','tel'],
+  ['phone','phone',' 1','tel'],
+  ['phone2','phone',' 2','tel'],
+  ['whatsapp','whatsapp',' 1','wa'],
+  ['whatsapp2','whatsapp',' 2','wa'],
+  ['email','email',' 1','mail'],
+  ['email2','email',' 2','mail'],
+  ['notes','notes','',null]
+];
+
+function digits(v){ return v.replace(/\s*\(0\)\s*/,'').replace(/[^\d+]/g,''); }
+function esc(v){ return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// A multi-line value (e.g. a 4-line address) arrives here as the literal two characters
+// "\n" — designer.html encodes it that way so a real line break inside a field doesn't
+// get mistaken for the start of a brand new field in the ?d=... data string.
+function unescapeNewlines(s){ return String(s).replace(/\\n/g,'\n'); }
+
+function actionsHtml(t, type, value){
+  if(type==='map'){
+    var q = encodeURIComponent(unescapeNewlines(value).replace(/\n+/g,', '));
+    return '<a class="btn" href="https://maps.apple.com/?q='+q+'">'+t.apple+'</a><a class="btn" href="https://maps.google.com/maps?q='+q+'">'+t.google+'</a>';
+  }
+  if(type==='tel') return '<a class="btn green" href="tel:'+digits(value)+'">'+t.call+'</a>';
+  if(type==='wa')  return '<a class="btn green" href="https://wa.me/'+digits(value).replace(/\D/g,'')+'">'+t.openWhatsApp+'</a>';
+  if(type==='mail') return '<a class="btn" href="mailto:'+value+'">'+t.emailAction+'</a>';
+  return '';
+}
+
+function row(label, value, actions){
+  // .value has white-space:pre-line in the stylesheet, so a real line break here already
+  // renders as a visual line break — no <br> markup needed, just unescape back to one.
+  return '<div class="row"><div class="label">'+esc(label)+'</div><div class="value">'+esc(unescapeNewlines(value))+'</div>'+(actions?'<div class="actions">'+actions+'</div>':'')+'</div>';
+}
+
+function renderColumn(target, langCode){
+  var t = LANGS[langCode];
+  var rtl = langCode==='ar';
+  var html = '<div'+(rtl?' dir="rtl"':'')+'><h2 class="column-title">'+t.title+'</h2>';
+  var any=false;
+  FIELD_ORDER.forEach(function(f){
+    var key=f[0], labelKey=f[1], suffix=f[2], actionType=f[3];
+    var value = data[key];
+    if(!value) return;
+    any=true;
+    var label = t[labelKey] + suffix;
+    html += row(label, value, actionType ? actionsHtml(t, actionType, value) : '');
+  });
+  if(!any) html += '<div class="row"><div class="value muted">No details were included in this QR.</div></div>';
+  html += '<div class="card note" style="margin:14px 0 0"><strong>'+esc(t.message)+'</strong></div></div>';
+  target.innerHTML = html;
+}
+
+// "Copy original/translated information" puts a plain-text block on the clipboard, and when
+// that's pasted into an app with its own smart data detection (Apple Notes being the classic
+// case), it re-detects phone numbers and emails in that pasted text and makes them tap-to-call
+// / tap-to-email on its own — including the tel/whatsapp/email fields sitting right next to
+// unrelated text like Notes, making the whole block look "clickable". The on-page tel:/mailto:
+// links (built by actionsHtml above) are a deliberate, separate feature and are NOT touched by
+// this — this only changes what lands in the clipboard. Inserting an invisible zero-width space
+// mid-value breaks the digit-run / user@domain pattern those detectors look for, without
+// changing how the copied text reads to a person. Same fix as the earlier address label project.
+function deLinkify(value, actionType){
+  var kind = actionType;
+  if(!value || !kind) return value;
+  /* Soft-hyphen trick — copied verbatim from the Address Label app, which is proven in
+     real use on iPhone: U+00AD is invisible and non-breaking, but it breaks Apple Notes
+     Data Detectors so numbers/emails are NOT auto-linked. Crucially it is applied once
+     per digit GROUP, not per digit, so the value stays short and clean — a number pasted
+     out of Notes into the iPhone dialler still dials correctly.
+     Works in Notes, Word, TextEdit — renders identically to the original. */
+  var s = value;
+  /* Soft-hyphen after every digit sequence — breaks phone AND street number detection */
+  s = s.replace(/(\d+)/g, '$1\u00AD');
+  /* Soft-hyphen before @ — breaks email Data Detectors */
+  s = s.replace(/@/g, '\u00AD@');
+  /* Soft-hyphen before every dot — breaks URL/domain Data Detectors */
+  s = s.replace(/\./g, '\u00AD.');
+  return s;
+}
+
+function clipText(langCode){
+  var t = LANGS[langCode];
+  var lines = [];
+  FIELD_ORDER.forEach(function(f){
+    var key=f[0], labelKey=f[1], suffix=f[2], actionType=f[3];
+    var value = data[key];
+    if(!value) return;
+    var safeValue = deLinkify(unescapeNewlines(value), actionType);
+    lines.push((t[labelKey]+suffix)+'\n'+safeValue);
+  });
+  lines.push(t.message);
+  return lines.join('\n\n');
+}
+
+var selectedLang = null;
+
+function renderTranslation(){
+  renderColumn(document.getElementById('translated'), selectedLang);
+}
+
+function copyText(text, message){
+  function done(){ alert(message); }
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done);
+  else{
+    var a=document.createElement('textarea'); a.value=text; document.body.appendChild(a); a.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    a.remove(); done();
+  }
+}
+function copyOriginal(){ copyText(clipText('en'), 'Original information copied.'); }
+function copyTranslated(){
+  copyText(clipText(selectedLang), LANGS[selectedLang].title+' translation copied.');
+}
+
+function vEsc(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
+function buildVCard(){
+  var lines=['BEGIN:VCARD','VERSION:3.0'];
+  lines.push('FN:'+vEsc(data.name||'Contact'));
+  lines.push('N:'+vEsc(data.name||'Contact')+';;;;');
+  if(data.org) lines.push('ORG:'+vEsc(data.org));
+  if(data.mobile) lines.push('TEL;TYPE=CELL:'+vEsc(data.mobile));
+  if(data.mobile2) lines.push('TEL;TYPE=CELL:'+vEsc(data.mobile2));
+  if(data.phone) lines.push('TEL;TYPE=HOME,VOICE:'+vEsc(data.phone));
+  if(data.phone2) lines.push('TEL;TYPE=HOME,VOICE:'+vEsc(data.phone2));
+  if(data.whatsapp && data.whatsapp!==data.mobile) lines.push('TEL;TYPE=CELL:'+vEsc(data.whatsapp));
+  if(data.email) lines.push('EMAIL;TYPE=INTERNET:'+vEsc(data.email));
+  if(data.email2) lines.push('EMAIL;TYPE=INTERNET:'+vEsc(data.email2));
+  // unescapeNewlines() turns the literal "\n" the data string carries back into a real
+  // line break, then vEsc() re-escapes it the vCard-correct way — so the address keeps
+  // its original lines instead of showing a literal backslash-n in Contacts.
+  if(data.address) lines.push('ADR;TYPE=HOME:;;'+vEsc(unescapeNewlines(data.address))+';;;;');
+  if(data.address2) lines.push('ADR;TYPE=WORK:;;'+vEsc(unescapeNewlines(data.address2))+';;;;');
+  lines.push('URL:'+location.href.split('?')[0]);
+  var noteParts=[];
+  if(data.notes) noteParts.push(unescapeNewlines(data.notes));
+  noteParts.push(LANGS.en.message);
+  requestedCodes.forEach(function(c){ noteParts.push(LANGS[c].message); });
+  lines.push('NOTE:'+vEsc(noteParts.join('\n')));
+  lines.push('END:VCARD');
+  return lines.join('\r\n');
+}
+function saveContact(){
+  var blob = new Blob([buildVCard()], {type:'text/vcard'});
+  var url = URL.createObjectURL(blob);
+  window.location.href = url;
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Render
+// ══════════════════════════════════════════════════════════════
+(function init(){
+  if(data.name) document.getElementById('heroName').textContent = data.name;
+  if(!Object.keys(data).length){
+    document.getElementById('emptyState').innerHTML =
+      '<div class="empty"><div class="e-icon">🔍</div><h2>No data found</h2><p>This QR code doesn\'t contain any contact information. Please check the generator settings.</p></div>';
+    return;
+  }
+  var codes = requestedCodes.length >= 5 ? requestedCodes : ['es','fr','de','it','pt'];
+  // Each button's own label is "Select Language" translated INTO that language (not the
+  // language's name) — e.g. the Spanish button reads "Seleccionar idioma" — so someone who
+  // only reads that language can recognise their own option without already knowing its name.
+  var btnHost = document.getElementById('langButtons');
+  codes.forEach(function(c){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'lang-btn';
+    btn.textContent = LANGS[c].selectLanguage;
+    btn.setAttribute('lang', c);
+    btn.addEventListener('click', function(){ selectLanguage(c); });
+    btnHost.appendChild(btn);
+  });
+  document.getElementById('toolbar').style.display='';
+  document.getElementById('columns').style.display='';
+  document.getElementById('actionButtons').style.display='';
+  renderColumn(document.getElementById('original'), 'en');
+  selectLanguage(codes[0]);
+})();
+
+function selectLanguage(code){
+  selectedLang = code;
+  document.querySelectorAll('.lang-btn').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('lang')===code);
+  });
+  var hint = document.getElementById('scrollHint');
+  hint.textContent = LANGS[code].scrollDown;
+  hint.style.display = '';
+  renderTranslation();
+}
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('./sw.js'); });
+}
+</script>
+</body>
+</html>
